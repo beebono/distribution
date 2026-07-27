@@ -1,0 +1,33 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (C) 2025-present ROCKNIX (https://github.com/ROCKNIX)
+
+# Undo whatever pre/001-audio did to keep the pcm closed over the suspend.
+
+. /etc/profile
+
+SLEEP_MODE="/run/.audio_sleep_mode"
+SLEEP_CARD="/run/.audio_sleep_card"
+
+case "$(cat ${SLEEP_MODE} 2>/dev/null)" in
+  services)
+    log $0 "Starting audio services after wake."
+    # wireplumber is started by name rather than left to the Wants= from
+    # pipewire.service: it was stopped by name, and without the session
+    # manager no sink is created and nothing opens the card again.
+    systemctl start pipewire.socket pipewire-pulse.socket pipewire-manager.socket
+    systemctl start pipewire.service
+    systemctl start wireplumber.service
+    systemctl start pipewire-pulse.service
+    log $0 "Audio services: pipewire=$(systemctl is-active pipewire.service) wireplumber=$(systemctl is-active wireplumber.service) pulse=$(systemctl is-active pipewire-pulse.service)"
+    ;;
+  profile)
+    read CARD PROFILE </run/.audio_sleep_card 2>/dev/null
+    if [ -n "${CARD}" ] && [ -n "${PROFILE}" ]; then
+      log $0 "Restoring card ${CARD} to profile ${PROFILE}."
+      pactl set-card-profile "${CARD}" "${PROFILE}"
+    fi
+    ;;
+esac
+
+rm -f ${SLEEP_MODE} ${SLEEP_CARD}

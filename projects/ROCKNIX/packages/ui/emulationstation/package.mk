@@ -14,6 +14,11 @@ PKG_BUILD_FLAGS="-gold"
 GET_HANDLER_SUPPORT="git"
 PKG_PATCH_DIRS+="${DEVICE}"
 
+if [ "${DEVICE}" = "T618" ]; then
+  PKG_VERSION="79abff2f99019ad4fab66f2ade863fd5a4dca3e4"
+  PKG_SITE="https://github.com/beebono/emulationstation-next"
+fi
+
 if [ ! "${OPENGL}" = "no" ]; then
   PKG_DEPENDS_TARGET+=" ${OPENGL} glu"
   PKG_CMAKE_OPTS_TARGET+=" -DGL=1"
