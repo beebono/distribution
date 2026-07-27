@@ -1,0 +1,59 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (C) 2025-present ROCKNIX (https://github.com/ROCKNIX)
+
+# Workaround for no audio on wake from sleep.
+#
+# If a pcm is open across a suspend, the agcp dsp comes back wedged: the dma
+# is re-armed and started but never receives a request, so no data moves and
+# no interrupts fire - for that stream and for every stream opened after it,
+# until reboot. Suspending with the pcm closed avoids it entirely.
+#
+# Setting the card profile to 'off' destroys the alsa node and closes the
+# pcm while leaving clients connected to pipewire-pulse, so EmulationStation
+# and any running emulator survive the sleep. ('pactl suspend-sink' does not
+# work for this - pipewire keeps the device open while a stream is linked.)
+#
+# If that somehow leaves the pcm open, fall back to stopping the stack:
+# clients lose their connections and do not reattach, but that is better
+# than an soc that needs a reboot to make sound again.
+
+. /etc/profile
+
+PCM_STATUS="/proc/asound/card0/pcm0p/sub0/status"
+SLEEP_MODE="/run/.audio_sleep_mode"
+SLEEP_CARD="/run/.audio_sleep_card"
+
+# True when the pcm is open, and when we cannot tell (no VERBOSE_PROCFS).
+pcm_is_open() {
+  [ -e "${PCM_STATUS}" ] || return 0
+  ! grep -q "^closed" "${PCM_STATUS}"
+}
+
+# Wait up to a second for the pcm to actually go away.
+wait_for_close() {
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    pcm_is_open || return 0
+    sleep .1
+  done
+  return 1
+}
+
+CARD="$(pactl list cards short | awk '{print $2; exit}')"
+PROFILE="$(pactl list cards | awk '/Active Profile:/{print $3; exit}')"
+
+if [ -n "${CARD}" ] && [ -n "${PROFILE}" ] && [ "${PROFILE}" != "off" ]; then
+  log $0 "Turning off card ${CARD} (profile ${PROFILE}) for sleep."
+  echo "${CARD} ${PROFILE}" >${SLEEP_CARD}
+  pactl set-card-profile "${CARD}" off
+fi
+
+if wait_for_close; then
+  log $0 "PCM closed via card profile."
+  echo "profile" >${SLEEP_MODE}
+else
+  log $0 "PCM still open, stopping audio services."
+  echo "services" >${SLEEP_MODE}
+  systemctl stop pipewire-manager.socket pipewire-pulse.socket pipewire.socket
+  systemctl stop pipewire-pulse.service wireplumber.service pipewire.service
+fi

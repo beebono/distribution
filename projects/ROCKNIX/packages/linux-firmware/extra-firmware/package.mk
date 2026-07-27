@@ -9,6 +9,12 @@ PKG_URL="https://github.com/ROCKNIX/extra-firmware/archive/${PKG_VERSION}.tar.gz
 PKG_LONGDESC="extra-firmware: Extra kernel firmware needed for ROCKNIX devices"
 PKG_TOOLCHAIN="manual"
 
+if [[ "${DEVICE}" = "T618" ]]; then
+  PKG_VERSION="4fa73fd7351194c8ce2e63e182b923b115e2c323"
+  PKG_SITE="https://github.com/beebono/extra-firmware"
+  PKG_URL="${PKG_SITE}/archive/${PKG_VERSION}.tar.gz"
+fi
+
 makeinstall_target() {
   mkdir -p ${INSTALL}/$(get_full_firmware_dir)
 
@@ -16,5 +22,6 @@ makeinstall_target() {
     "SM6115") cp -a SM6115/* ${INSTALL}/$(get_full_firmware_dir) ;;
     "SM8250") cp -a SM8250/* ${INSTALL}/$(get_full_firmware_dir) ;;
     "SM8750") cp -a SM8750/* ${INSTALL}/$(get_full_firmware_dir) ;;
+    "T618") cp -a T618/* ${INSTALL}/$(get_full_firmware_dir) ;;
   esac
 }

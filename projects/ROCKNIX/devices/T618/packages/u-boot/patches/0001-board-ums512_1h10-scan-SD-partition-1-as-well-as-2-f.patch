@@ -1,0 +1,100 @@
+From 28459dd54a35e82469beae1250002173b314047a Mon Sep 17 00:00:00 2001
+From: ROCKNIX <noreply@rocknix>
+Date: Thu, 23 Jul 2026 22:11:40 -0500
+Subject: [PATCH] board: ums512_1h10: scan SD partition 1 as well as 2 for
+ extlinux
+
+The extlinux scan only probed mmc 1:2, which matches the Debian bring-up
+card (ext4 rootfs carrying /boot/extlinux/extlinux.conf). ROCKNIX images
+lay the boot files down on partition 1 instead - a FAT32 "system"
+partition holding /extlinux/extlinux.conf - so the scan never found a
+config and fell straight through to the halt path.
+
+Probe both partitions. No card carries both layouts, so the ordering is
+not load-bearing, and the existing behaviour on a Debian card is
+unchanged. Control flow on a found-but-failed config is preserved: it
+still falls through to the diagnostic halt rather than returning early.
+---
+ board/spreadtrum/ums512_1h10/extlinux_diag.c | 58 +++++++++++++-------
+ 1 file changed, 37 insertions(+), 21 deletions(-)
+
+diff --git a/board/spreadtrum/ums512_1h10/extlinux_diag.c b/board/spreadtrum/ums512_1h10/extlinux_diag.c
+index 5eab53c..b1924f0 100644
+--- a/board/spreadtrum/ums512_1h10/extlinux_diag.c
++++ b/board/spreadtrum/ums512_1h10/extlinux_diag.c
+@@ -315,7 +315,14 @@ static int do_extlinux_scan(cmd_tbl_t *cmdtp, int flag, int argc,
+ 		"/extlinux/extlinux.conf",
+ 		"/boot/extlinux/extlinux.conf",
+ 	};
+-	int sd_present, fi;
++	/*
++	 * Partition 1 is the ROCKNIX layout (FAT32 "system" partition holding
++	 * /extlinux/extlinux.conf); partition 2 is the Debian bring-up layout
++	 * (ext4 rootfs holding /boot/extlinux/extlinux.conf). No card carries
++	 * both, so the order here is not load-bearing.
++	 */
++	static const int parts[] = { 1, 2 };
++	int sd_present, fi, pi;
+ 
+ 	printf("[uboot] extlinux diagnostic scan\n");
+ 
+@@ -347,30 +354,39 @@ static int do_extlinux_scan(cmd_tbl_t *cmdtp, int flag, int argc,
+ 	}
+ 
+ 	if (sd_present) {
+-		for (fi = 0; fi < ARRAY_SIZE(paths); fi++) {
+-			if (!file_exists("mmc", "1:2", paths[fi], FS_TYPE_ANY))
+-				continue;
+-
+-			printf("[uboot] found %s, booting audio DSP\n",
+-			       paths[fi]);
+-
+-			/*
+-			 * Show our own "Booting..." banner (not the stock logo)
+-			 * so it's clear we're on the custom firmware, then set up
+-			 * the audio DSP right before we jump to the kernel.
+-			 */
+-			lcd_banner("Booting...");
+-			memset_dsp_share_memory();
+-
+-			if (!try_sysboot(1, 2, paths[fi]))
+-				return 0;
++		for (pi = 0; pi < ARRAY_SIZE(parts); pi++) {
++			char dev_part[8];
++
++			snprintf(dev_part, sizeof(dev_part), "1:%d", parts[pi]);
++
++			for (fi = 0; fi < ARRAY_SIZE(paths); fi++) {
++				if (!file_exists("mmc", dev_part, paths[fi],
++						 FS_TYPE_ANY))
++					continue;
++
++				printf("[uboot] found %s on mmc %s, booting audio DSP\n",
++				       paths[fi], dev_part);
+ 
+-			/* Config was there, but boot failed. Nothing to fall back to. */
+-			printf("[uboot] sysboot failed after DSP boot\n");
+-			break;
++				/*
++				 * Show our own "Booting..." banner (not the stock logo)
++				 * so it's clear we're on the custom firmware, then set up
++				 * the audio DSP right before we jump to the kernel.
++				 */
++				lcd_banner("Booting...");
++				memset_dsp_share_memory();
++
++				if (!try_sysboot(1, parts[pi], paths[fi]))
++					return 0;
++
++				/* Config was there, but boot failed. Nothing to fall back to. */
++				printf("[uboot] sysboot failed after DSP boot\n");
++				goto scan_done;
++			}
+ 		}
+ 	}
+ 
++scan_done:
++
+ 	/*
+ 	 * This U-Boot is hosted on the SD card and boots mainline directly, so
+ 	 * there is no stock to hand back to. Stop here so a failed or missing
