@@ -1,0 +1,12 @@
+[Unit]
+Description=Match display orientation to the hall swivel on T618
+After=rocknix.target sway.service
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/autostart/quirks/platforms/T618/bin/lid-rotate
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=rocknix.target

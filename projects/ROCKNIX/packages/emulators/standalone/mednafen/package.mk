@@ -25,7 +25,7 @@ pre_configure_target() {
                       --disable-ssfplay"
 
   case ${DEVICE} in
-    RK3326|RK3566*|H700)
+    RK3326|RK3566*|T618|H700)
       DISABLED_MODULES+=" --disable-snes \
                           --disable-ss \
                           --disable-psx"

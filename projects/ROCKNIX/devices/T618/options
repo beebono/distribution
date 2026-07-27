@@ -1,0 +1,94 @@
+################################################################################
+# setup device defaults
+################################################################################
+
+  # The TARGET_CPU variable controls which processor should be targeted for
+  # generated code.
+    case ${TARGET_ARCH} in
+      aarch64)
+        TARGET_CPU="cortex-a75.cortex-a55"
+        TARGET_CPU_FLAGS="+crc+crypto"
+        ;;
+      arm)
+        TARGET_KERNEL_ARCH="arm64"
+        TARGET_FLOAT="hard"
+        TARGET_CPU="cortex-a75.cortex-a55"
+        TARGET_CPU_FLAGS="+crc"
+        TARGET_FPU="neon-fp-armv8"
+        ;;
+    esac
+
+    PARTITION_TABLE="gpt"
+    HW_CPU="Unisoc Tiger T618"
+
+  # Kernel target
+    KERNEL_TARGET="Image"
+
+  # Kernel extra targets to build
+    KERNEL_MAKE_EXTRACMD=" $(get_kernel_make_extracmd)"
+
+  # Kernel cmdline
+    EXTRA_CMDLINE="quiet console=tty0"
+
+  # Bootloader to use (syslinux / u-boot)
+    BOOTLOADER="u-boot"
+
+  # U-Boot firmware package(s) to use
+    UBOOT_FIRMWARE=""
+
+  # Mali GPU family
+    MALI_FAMILY="bifrost-g52"
+    GRAPHIC_DRIVERS="mali panfrost"
+
+  # For maximum cross compatbility
+    PREFER_GLES="yes"
+
+  # VULKAN_SUPPORT
+    VULKAN_SUPPORT="yes"
+
+  # Vulkan implementation to use (vulkan-loader / no)
+    VULKAN="vulkan-loader"
+
+  # Displayserver to use (wl / no)
+    DISPLAYSERVER="wl"
+
+  # Windowmanager to use (weston / swaywm-env / no)
+    WINDOWMANAGER="swaywm-env"
+
+  # Pipewire audio support (yes / no)
+    PIPEWIRE_SUPPORT="yes"
+
+  # Additional drivers to install:
+  # for a list of additional drivers see packages/linux-drivers
+  # Space separated list is supported,
+  # e.g. ADDITIONAL_DRIVERS="DRIVER1 DRIVER2"
+    ADDITIONAL_DRIVERS="mali-bifrost"
+
+  # Additional Firmware to use ( )
+  # Space separated list is supported,
+  # e.g. FIRMWARE=""
+  # AGDSP audio DSP, Marlin3 WCN combo (wifi/bt/gnss) and the SC2355/BT INI
+  # blobs all live in extra-firmware.
+    FIRMWARE="extra-firmware"
+
+  # Additional packages to install
+    ADDITIONAL_PACKAGES="inputplumber libmali"
+    ADDITIONAL_PACKAGES_32BIT="libmali"
+
+  # Build and install rocknix out-of-tree device trees and overlays (yes / no)
+    ROCKNIX_DEVICE_TREE_OVERLAYS="no"
+
+  # build and install rocknix joypad driver (yes / no)
+    ROCKNIX_JOYPAD="no"
+
+  # Kernel target
+    KERNEL_TARGET="Image"
+
+  # ZRAM Algorithm
+    ZRAM_COMPRESSION_ALGO="zstd"
+
+  # ZRAM Size
+    ZRAM_SWAP_SIZE="Auto"
+
+  # Disk Swap
+    SWAP_FILE_SIZE="0"

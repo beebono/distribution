@@ -57,6 +57,12 @@ case ${DEVICE} in
     PKG_SHA256="9df30b02dd8102bbd0be52556288ef6889ddbe7f1ddb96fbf847d0becf3eacac"
     PKG_URL="https://www.kernel.org/pub/linux/kernel/v${PKG_VERSION/.*/}.x/${PKG_NAME}-${PKG_VERSION}.tar.xz"
     ;;
+  T618)
+    PKG_VERSION="464b3e7bf45bb300e190339977abba36c8078e1f"
+    PKG_URL="https://github.com/beebono/linux-mainline-sprd/archive/${PKG_VERSION}.tar.gz"
+    PKG_GIT_CLONE_BRANCH="rg-rotate"
+    PKG_PATCH_DIRS+=" 7.0"
+    ;;
 esac
 
 PKG_KERNEL_CFG_FILE=$(kernel_config_path) || die
@@ -89,6 +95,9 @@ if [ "${DEVICE}" = "RK3326" -o "${DEVICE}" = "RK3566" ]; then
   PKG_DEPENDS_UNPACK+=" generic-dsi"
 elif [ "${DEVICE}" = "SM8250" -o "${DEVICE}" = "H700" -o "${DEVICE}" = "SM8650" -o "${DEVICE}" = "SM8750" ]; then
   PKG_DEPENDS_UNPACK+=" kernel-firmware"
+elif [ "${DEVICE}" = "T618" ]; then
+  # regulatory.db is built into vmlinux - see pre_make_target()
+  PKG_DEPENDS_UNPACK+=" wireless-regdb"
 fi
 
 # SM8650/SM8750 build device-specific firmware blobs into the kernel, so the
@@ -287,6 +296,22 @@ pre_make_target() {
 
     ${PKG_BUILD}/scripts/config --set-str CONFIG_EXTRA_FIRMWARE "${FW_LIST}"
     ${PKG_BUILD}/scripts/config --set-str CONFIG_EXTRA_FIRMWARE_DIR "external-firmware"
+  elif [ "${TARGET_ARCH}" = "aarch64" -a "${DEVICE}" = "T618" ]; then
+    # CONFIG_CFG80211=y, so cfg80211 requests regulatory.db during kernel init.
+    # Every other firmware consumer here is a module loaded after userspace has
+    # run kernel-overlays-setup, but at kernel init /usr/lib/firmware is still
+    # only a dangling symlink to /run/kernel-overlays/firmware - the load fails
+    # with -ENOENT, the sysfs fallback times out 60s later, and the device is
+    # left in world regulatory domain with every 5GHz channel marked no-IR.
+    # Building the db into vmlinux removes the ordering dependency entirely.
+    mkdir -p ${PKG_BUILD}/external-firmware
+      cp -Lv $(get_build_dir wireless-regdb)/regulatory.db ${PKG_BUILD}/external-firmware
+      cp -Lv $(get_build_dir wireless-regdb)/regulatory.db.p7s ${PKG_BUILD}/external-firmware
+
+    FW_LIST="$(find ${PKG_BUILD}/external-firmware -type f | sed 's|.*external-firmware/||' | sort | xargs)"
+
+    ${PKG_BUILD}/scripts/config --set-str CONFIG_EXTRA_FIRMWARE "${FW_LIST}"
+    ${PKG_BUILD}/scripts/config --set-str CONFIG_EXTRA_FIRMWARE_DIR "external-firmware"
   fi
 
   # cfg80211 requests regulatory.db as soon as it initialises. Built in (=y on
@@ -429,7 +454,7 @@ makeinstall_target() {
     mkdir -p ${INSTALL}/usr/share/bootloader
     for dtb in arch/${TARGET_KERNEL_ARCH}/boot/dts/**/*.dtb; do
       if [ -f ${dtb} ]; then
-        if [ "${DEVICE}" = "H700" -o "${DEVICE}" = "RK3326" -o "${DEVICE}" = "RK3399" -o "${DEVICE}" = "RK3566" -o "${DEVICE}" = "RK3576" -o "${DEVICE}" = "RK3588" ]; then
+        if [ "${DEVICE}" = "H700" -o "${DEVICE}" = "RK3326" -o "${DEVICE}" = "RK3399" -o "${DEVICE}" = "RK3566" -o "${DEVICE}" = "RK3576" -o "${DEVICE}" = "RK3588" -o "${DEVICE}" = "T618" ]; then
           mkdir -p ${INSTALL}/usr/share/bootloader/device_trees
           cp -v ${dtb} ${INSTALL}/usr/share/bootloader/device_trees
         else

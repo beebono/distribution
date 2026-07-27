@@ -43,7 +43,7 @@ esac
 
 # new repo base from jeffycn mirror
 case "${DEVICE}" in
-  RK3326|RK3566|RK3576)
+  RK3326|RK3566|RK3576|T618)
     PKG_SITE="https://github.com/JeffyCN/mirrors"
     PKG_SHA256="54b8af924f582f7da7e120fbad4812a502cc7cc67f6d6ab061377cb403f3eb2d"
     PKG_VERSION="4233031d818e97a19e8a9cdbbd5c15795ededd93"
@@ -101,10 +101,10 @@ post_makeinstall_target() {
       curl -Lo ${INSTALL}/usr/lib/libmali-${MALI_FAMILY}-${DRIVER_VERSION}-x11-gbm.so ${PKG_SITE}/raw/master/lib/aarch64-linux-gnu/libmali-${MALI_FAMILY}-${DRIVER_VERSION}-x11-gbm.so
   fi
   # S922X - mali vulkan libs need moving
-  if [[ "${DEVICE}" =~ S922X|RK3326|RK3566|RK3576 ]] && [ "${ARCH}" = "aarch64" ]; then
+  if [[ "${DEVICE}" =~ S922X|RK3326|RK3566|RK3576|T618 ]] && [ "${ARCH}" = "aarch64" ]; then
     mv "${INSTALL}"/usr/lib/mali/libMaliVulkan.* "${INSTALL}"/usr/lib/
   fi
-  if [[ "${DEVICE}" =~ RK3326|RK3566|RK3576 ]] && [ "${ARCH}" = "arm" ]; then
+  if [[ "${DEVICE}" =~ RK3326|RK3566|RK3576|T618 ]] && [ "${ARCH}" = "arm" ]; then
     mv "${INSTALL}"/usr/lib32/mali/libMaliVulkan.* "${INSTALL}"/usr/lib32/
   fi
 

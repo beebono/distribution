@@ -1,0 +1,18 @@
+[Unit]
+Description=Hold logind off the lid switch when T618 boots with the swivel shut
+# Must be running before logind's boot holdoff expires, which is 30s from
+# *kernel* start (logind.c:1067 passes a bare '0 + holdoff' as an absolute
+# CLOCK_MONOTONIC deadline; the resume path adds now() and is unaffected).
+# Total boot here is ~29s, so this cannot wait on rocknix.target - it is
+# ordered only after logind, which is up at ~18s.
+After=systemd-logind.service
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/autostart/quirks/platforms/T618/bin/lid-rotate --boot-hold
+# Exits on its own the first time the swivel is opened, and that exit is
+# the point - it releases the inhibitor. Not a failure, never restart.
+Restart=no
+
+[Install]
+WantedBy=multi-user.target

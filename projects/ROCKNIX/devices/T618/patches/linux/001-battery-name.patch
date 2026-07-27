@@ -1,0 +1,12 @@
+diff -rupN linux.orig/drivers/power/supply/sc27xx_fuel_gauge.c linux/drivers/power/supply/sc27xx_fuel_gauge.c
+--- linux.orig/drivers/power/supply/sc27xx_fuel_gauge.c
++++ linux/drivers/power/supply/sc27xx_fuel_gauge.c
+@@ -891,7 +891,7 @@ static enum power_supply_property sc27xx
+ };
+
+ static const struct power_supply_desc sc27xx_fgu_desc = {
+-	.name			= "sc27xx-fgu",
++	.name			= "battery",
+ 	.type			= POWER_SUPPLY_TYPE_BATTERY,
+ 	.properties		= sc27xx_fgu_props,
+ 	.num_properties		= ARRAY_SIZE(sc27xx_fgu_props),

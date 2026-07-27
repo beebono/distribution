@@ -4,7 +4,32 @@
 . config/functions
 
 mkimage_uboot() {
-  if [ -f "${RELEASE_DIR}/3rdparty/bootloader/${SUBDEVICE}_uboot.bin" ]; then
+  if [ "${DEVICE}" = "T618" ]; then
+    # Unisoc UMS512: the SPL (already flashed to eMMC) boots u-boot from the SD
+    # card by scanning its GPT for a partition literally named "uboot" (the
+    # hybrid path: secure world from eMMC, u-boot from SD). That path runs
+    # *before* the eMMC uboot_a/b slots, so it wins over the stock u-boot. The
+    # raw sector-200 read is only a fallback gated behind an eMMC-uboot failure,
+    # so it never fires on a device with an intact stock eMMC - hence a real
+    # partition rather than a raw offset.
+    #
+    # The GPT (system=1, storage=2) already exists here; add "uboot" in the
+    # empty pre-system gap. parted takes the next free slot (3) and does not
+    # renumber system/storage, and the SPL matches by name regardless. The image
+    # is the DHTB-wrapped u-boot from dhtb_pack.py: a 512-byte header
+    # (== KEY_INFO_SIZ, magic "DHTB" + mImgSize) followed by the raw payload,
+    # exactly the layout load_partition_with_header() expects (header at
+    # partition offset 0, payload jumped to at CONFIG_SYS_TEXT_BASE).
+    local UBOOT_PART_START=2048           # 1 MiB in; clear of the GPT (ends s33)
+    local UBOOT_PART_SECTORS=4096         # 2 MiB; payload is <1 MiB (UBOOT_MAX_SIZE)
+    local UBOOT_PART_END=$((UBOOT_PART_START + UBOOT_PART_SECTORS - 1))
+
+    echo "image: creating uboot partition on $(basename "${DISK}")..."
+    parted -s "${DISK}" -a min unit s mkpart uboot ${UBOOT_PART_START} ${UBOOT_PART_END} >"${SAVE_ERROR}" 2>&1 || show_error
+
+    echo "image: writing uboot.bin into the uboot partition..."
+    dd if="${RELEASE_DIR}/3rdparty/bootloader/uboot.bin" of="${DISK}" bs=512 seek=${UBOOT_PART_START} conv=fsync,notrunc >"${SAVE_ERROR}" 2>&1 || show_error
+  elif [ -f "${RELEASE_DIR}/3rdparty/bootloader/${SUBDEVICE}_uboot.bin" ]; then
     # RK3566-Generic and RK3566-Powkiddy_x55
     echo "image: writing ${SUBDEVICE}_uboot.bin to $(basename "${DISK}")..."
     dd if="${RELEASE_DIR}/3rdparty/bootloader/${SUBDEVICE}_uboot.bin" of="${DISK}" bs=512 seek=64 conv=sync,noerror,notrunc >"${SAVE_ERROR}" 2>&1 || show_error

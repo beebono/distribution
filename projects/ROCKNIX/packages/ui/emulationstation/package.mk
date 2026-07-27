@@ -12,6 +12,23 @@ PKG_NEED_UNPACK="busybox"
 PKG_LONGDESC="Emulationstation emulator frontend"
 PKG_BUILD_FLAGS="-gold"
 
+PKG_PATCH_DIRS+="${DEVICE}"
+
+if [ "${DEVICE}" = "T618" ]; then
+  PKG_VERSION="79abff2f99019ad4fab66f2ade863fd5a4dca3e4"
+  PKG_SITE="https://github.com/beebono/emulationstation-next"
+fi
+
+if [ ! "${OPENGL}" = "no" ]; then
+  PKG_DEPENDS_TARGET+=" ${OPENGL} glu"
+  PKG_CMAKE_OPTS_TARGET+=" -DGL=1"
+fi
+
+if [ ! "${OPENGLES_SUPPORT}" = no ]; then
+  PKG_DEPENDS_TARGET+=" ${OPENGLES}"
+  PKG_CMAKE_OPTS_TARGET+=" -DGLES2=1"
+fi
+
 PKG_CMAKE_OPTS_TARGET+=" -DROCKNIX=1 \
                          -DDISABLE_KODI=1 \
                          -DENABLE_FILEMANAGER=0 \
