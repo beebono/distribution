@@ -137,4 +137,7 @@
     <file short="odin3" full="AYN Odin3">cq8725s-ayn-odin3</file>
     <file short="pocketfitelite" full="KONKR Pocket FIT Elite">sm8750-konkr-pf-elite</file>
   </SM8750>
+  <T618 mkimage_options="dtb,extlinux,uboot" fdt="device_trees/ums512-rg-rotate.dtb" fdt_type="fdt" dtb_prefix="sprd">
+    <file>ums512-rg-rotate</file>
+  </T618>
 </rocknix>

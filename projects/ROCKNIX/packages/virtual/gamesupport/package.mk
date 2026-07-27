@@ -15,6 +15,14 @@ case ${DEVICE} in
     ;;
 esac
 
+# The RG Rotate has no analog sticks, so it can trade its spare side button for
+# a DPad to left stick toggle.
+case ${DEVICE} in
+  T618)
+    PKG_GAMESUPPORT+=" rocknix-dpad-mode"
+    ;;
+esac
+
 # rocknix-touchscreen-keyboard requires sway
 [[ "${WINDOWMANAGER}" = "swaywm-env" ]] && PKG_GAMESUPPORT+=" rocknix-touchscreen-keyboard"
 

@@ -71,6 +71,11 @@ on:
         required: false
         default: false
         type: boolean
+      T618:
+        description: 'T618'
+        required: false
+        default: false
+        type: boolean
   workflow_call:
   pull_request:
     types: [ assigned ]
@@ -123,6 +128,7 @@ jobs:
             ["SM8650"]="${{ inputs.SM8650 }}"
             ["SM8750"]="${{ inputs.SM8750 }}"
             ["SM6115"]="${{ inputs.SM6115 }}"
+            ["T618"]="${{ inputs.T618 }}"
           )
           
           SELECTED_MATRIX=""

@@ -1,0 +1,202 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2026-present ROCKNIX (https://github.com/ROCKNIX)
+#
+# Toggles the InputPlumber device profile between DPad-native and DPad-as-left-stick
+# when the side button is held.
+#
+# The button is mapped to the DBus capability "ui_r3" in the device's capability
+# map, so it is consumed before the profile layer and never reaches the emulated
+# gamepad. We watch for it on the bus rather than reading evdev, because
+# inputplumber runs with HIDE_DEVICES_FROM_ROOT=1 and the source nodes are not
+# readable even as root.
+#
+# There is no DBus binding in the image, so this shells out to busctl.
+
+import json
+import os
+import subprocess
+import sys
+import threading
+import time
+
+BUS_NAME = "org.shadowblip.InputPlumber"
+ROOT_PATH = "/org/shadowblip/InputPlumber"
+COMPOSITE_IFACE = "org.shadowblip.Input.CompositeDevice"
+FF_IFACE = "org.shadowblip.Output.ForceFeedback"
+
+DEVICE_NAME = os.environ.get("DPAD_MODE_DEVICE", "Anbernic RG Rotate")
+TOGGLE_EVENT = os.environ.get("DPAD_MODE_EVENT", "ui_r3")
+HOLD_SECONDS = float(os.environ.get("DPAD_MODE_HOLD_SECONDS", "2.0"))
+
+PROFILE_DIR = "/usr/share/inputplumber/profiles"
+PROFILE_NATIVE = f"{PROFILE_DIR}/rg-rotate-dpad-native.yaml"
+PROFILE_STICK = f"{PROFILE_DIR}/rg-rotate-dpad-stick.yaml"
+
+# Number of CompositeDeviceN objects to probe when resolving the device.
+MAX_COMPOSITE_PROBE = 8
+
+
+def log(msg):
+    print(msg, file=sys.stderr, flush=True)
+
+
+def busctl(*args, check=True):
+    return subprocess.run(
+        ["busctl", *args],
+        capture_output=True,
+        text=True,
+        check=check,
+    )
+
+
+def get_property(path, iface, prop):
+    """Read a property, returning its unwrapped value or None."""
+    try:
+        out = busctl(
+            "--json=short", "get-property", BUS_NAME, path, iface, prop
+        ).stdout
+    except subprocess.CalledProcessError:
+        return None
+    try:
+        return json.loads(out).get("data")
+    except (ValueError, AttributeError):
+        return None
+
+
+def find_composite_device():
+    """Resolve the composite device path by name.
+
+    The index is not stable across boots if anything else on the system also
+    composites, so match on the Name property rather than hardcoding
+    CompositeDevice0.
+    """
+    for index in range(MAX_COMPOSITE_PROBE):
+        path = f"{ROOT_PATH}/CompositeDevice{index}"
+        name = get_property(path, COMPOSITE_IFACE, "Name")
+        if name == DEVICE_NAME:
+            return path
+    return None
+
+
+def rumble(path, intensity=0.4, duration=0.25):
+    """Give haptic confirmation that the mode changed. Best effort only.
+
+    Rumble sets a continuous intensity rather than firing a one-shot pulse, so
+    it has to be explicitly stopped or the motors latch on indefinitely. This
+    runs on the hold timer's thread, so blocking for the pulse is harmless.
+    """
+    try:
+        busctl("call", BUS_NAME, path, FF_IFACE, "Rumble", "d", str(intensity))
+        time.sleep(duration)
+    except (subprocess.CalledProcessError, OSError) as err:
+        log(f"rumble failed (non-fatal): {err}")
+    finally:
+        try:
+            busctl("call", BUS_NAME, path, FF_IFACE, "Stop", check=False)
+        except OSError as err:
+            log(f"rumble stop failed (non-fatal): {err}")
+
+
+def toggle_profile(path):
+    current = get_property(path, COMPOSITE_IFACE, "ProfilePath") or ""
+    # Anything that is not explicitly the stick profile is treated as native,
+    # which also covers the stock default.yaml loaded at device creation.
+    target = PROFILE_NATIVE if current == PROFILE_STICK else PROFILE_STICK
+
+    if not os.path.exists(target):
+        log(f"profile missing, refusing to switch: {target}")
+        return
+
+    try:
+        busctl("call", BUS_NAME, path, COMPOSITE_IFACE, "LoadProfilePath", "s", target)
+    except subprocess.CalledProcessError as err:
+        log(f"failed to load {target}: {err.stderr.strip()}")
+        return
+
+    log(f"switched profile to {target}")
+    rumble(path)
+
+
+def iter_values(node):
+    """Yield every scalar in a decoded JSON message.
+
+    busctl's payload nesting is not a stable documented contract, so match on
+    content rather than on a fixed key path.
+    """
+    if isinstance(node, dict):
+        for value in node.values():
+            yield from iter_values(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from iter_values(value)
+    else:
+        yield node
+
+
+def parse_input_event(line):
+    """Return the button value for our toggle event, or None if unrelated."""
+    try:
+        msg = json.loads(line)
+    except ValueError:
+        return None
+
+    if msg.get("member") != "InputEvent":
+        return None
+
+    # InputEvent carries (s, d): the capability name and its value.
+    values = list(iter_values(msg.get("payload", msg)))
+    if TOGGLE_EVENT not in values:
+        return None
+
+    for value in values:
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return float(value)
+    return None
+
+
+def main():
+    device_path = find_composite_device()
+    if device_path is None:
+        log(f"no composite device named {DEVICE_NAME!r}; nothing to do")
+        return 1
+    log(f"watching {device_path} for a {HOLD_SECONDS}s hold of {TOGGLE_EVENT}")
+
+    # Clear any rumble left latched by a previous run that died mid-pulse.
+    busctl("call", BUS_NAME, device_path, FF_IFACE, "Stop", check=False)
+
+    monitor = subprocess.Popen(
+        ["busctl", "monitor", "--json=short", BUS_NAME],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+
+    # Fire on a timer while the button is still down, so the switch happens at
+    # the moment the hold completes rather than on release.
+    timer = None
+    try:
+        for line in monitor.stdout:
+            value = parse_input_event(line)
+            if value is None:
+                continue
+
+            pressed = value >= 0.5
+            if pressed and timer is None:
+                timer = threading.Timer(HOLD_SECONDS, toggle_profile, [device_path])
+                timer.daemon = True
+                timer.start()
+            elif not pressed and timer is not None:
+                timer.cancel()
+                timer = None
+    except KeyboardInterrupt:
+        pass
+    finally:
+        if timer is not None:
+            timer.cancel()
+        monitor.terminate()
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
