@@ -1,0 +1,53 @@
+Use the modern LED color/function bindings for the RG Rotate LEDs.
+
+The sc27xx-bltc children in sc2730.dtsi carry legacy "label" properties
+(red/green/blue). leds-sc27xx-bltc passes init_data.devicename = "sc27xx",
+and led_compose_name() prepends devicename whenever a label is present, so
+the LEDs register as "sc27xx:red" / "sc27xx:green" / "sc27xx:yellow" -
+names no ROCKNIX battery_led_status script looks for.
+
+Dropping the labels in favour of color + function takes the other branch of
+led_compose_name(). devname_mandatory is false in this driver, so the name
+is composed from color and function alone, yielding "red:status",
+"green:power" and "yellow:charging".
+
+The default-on trigger on the green LED is dropped: battery_led_status now
+owns that LED and drives its brightness directly.
+
+diff -rupN linux.orig/arch/arm64/boot/dts/sprd/ums512-rg-rotate.dts linux/arch/arm64/boot/dts/sprd/ums512-rg-rotate.dts
+--- linux.orig/arch/arm64/boot/dts/sprd/ums512-rg-rotate.dts
++++ linux/arch/arm64/boot/dts/sprd/ums512-rg-rotate.dts
+@@ -7,6 +7,7 @@
+ 
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/input/input.h>
++#include <dt-bindings/leds/common.h>
+ #include <dt-bindings/clock/sprd,ums512-clk.h>
+ #include <dt-bindings/mfd/sprd,sc2730-regs.h>
+ #include <dt-bindings/mfd/sprd,sc2730-mask.h>
+@@ -331,12 +332,23 @@
+ 	};
+ };
+ 
++&led0 {
++	/delete-property/ label;
++	color = <LED_COLOR_ID_RED>;
++	function = LED_FUNCTION_STATUS;
++};
++
+ &led1 {
+-	linux,default-trigger = "default-on";
++	/delete-property/ label;
++	color = <LED_COLOR_ID_GREEN>;
++	function = LED_FUNCTION_POWER;
+ };
+ 
++/* Driven from the PMIC's blue channel, but the physical LED is yellow. */
+ &led2 {
+-	label = "yellow";
++	/delete-property/ label;
++	color = <LED_COLOR_ID_YELLOW>;
++	function = LED_FUNCTION_CHARGING;
+ };
+ 
+ &sc2730_fgu {
