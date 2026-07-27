@@ -8,9 +8,16 @@ PKG_LONGDESC="mali-bifrost: Linux drivers for Mali Bifrost GPUs"
 PKG_TOOLCHAIN="manual"
 PKG_IS_KERNEL_PKG="yes"
 
-PKG_VERSION="39da994bb6fc8819e5e8c1873907dd21d17e53c1"
-PKG_SHA256="f947b99a1bcb5b86ea270c1ce4cd189f4df26b3c0c8ba92c1ef256bb757afa66"
-PKG_URL="http://github.com/rocknix/mali_kbase/archive/${PKG_VERSION}.tar.gz"
+case ${DEVICE} in
+  T618)
+  PKG_VERSION="3248d9d67ca16376e094bb73a0e1e54b153fc8a7"
+  PKG_URL="http://github.com/beebono/mali_kbase/archive/${PKG_VERSION}.tar.gz"
+  ;;
+  *)
+  PKG_VERSION="39da994bb6fc8819e5e8c1873907dd21d17e53c1"
+  PKG_URL="http://github.com/rocknix/mali_kbase/archive/${PKG_VERSION}.tar.gz"
+  ;;
+esac
 
 make_target() {
   # S922X is an actual Amlogic Meson SoC — it requires the meson platform

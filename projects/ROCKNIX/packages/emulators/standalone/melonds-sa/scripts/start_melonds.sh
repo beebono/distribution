@@ -200,7 +200,7 @@ fi
 
 # QT platform - some device / driver combinations need wayland
 case ${HW_DEVICE} in
-    RK3566|RK3588|S922X)
+    RK3566|RK3588|S922X|T618)
         [[ $(/usr/bin/gpudriver) == "libmali" ]] && export QT_QPA_PLATFORM=wayland
     ;;
     SM6115)

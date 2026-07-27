@@ -1,0 +1,9 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (C) 2026 ROCKNIX (https://github.com/ROCKNIX)
+
+# cpu0-5 are the A55 little cluster, cpu6-7 the A75 big cluster.
+cat <<EOF >/storage/.config/profile.d/040-affinity
+SLOW_CORES="taskset -c 0-5"
+FAST_CORES="taskset -c 6-7"
+EOF

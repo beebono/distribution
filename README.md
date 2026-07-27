@@ -2,6 +2,16 @@
 
 ---
 
+## Unofficial Fork : Early Beta / Nightly
+
+**This is an unofficial fork of ROCKNIX and is NOT supported by the official ROCKNIX development team.**
+
+Builds published here are early Beta/Nightly quality: they are experimental, may be incomplete or unstable, and carry no guarantee of stability, data safety, or upgrade path. Use them at your own risk.
+
+**Do not report problems with these builds to the official ROCKNIX Discord server or issue tracker.** The ROCKNIX team did not produce these images and cannot help with them. Please raise issues on this fork instead: [https://github.com/beebono/distribution/issues](https://github.com/beebono/distribution/issues)
+
+---
+
 ROCKNIX is an immutable Linux distribution for handheld gaming devices developed by a small community of enthusiasts.  Our goal is to produce an operating system that has the features and capabilities that we need, and to have fun as we develop it.
 
 ## Features
@@ -33,6 +43,8 @@ ROCKNIX is an immutable Linux distribution for handheld gaming devices developed
 ## Community
 
 The ROCKNIX community utilizes Discord for discussion, if you would like to join us please use this link: [https://discord.gg/seTxckZjJy](https://discord.gg/seTxckZjJy)
+
+That Discord is for upstream ROCKNIX only. Questions, bug reports, and feature requests about **this fork's builds** belong in this repository's [issue tracker](https://github.com/beebono/distribution/issues) PLEASE do not take them to the ROCKNIX Discord.
 
 ## Licenses
 

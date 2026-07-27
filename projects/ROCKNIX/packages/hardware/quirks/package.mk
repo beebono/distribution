@@ -29,5 +29,9 @@ post_install() {
   if [ "${DEVICE}" = "SM6115" ]
   then
     enable_service duolite-bottom-screen.service
+  if [ "${DEVICE}" = "T618" ]
+  then
+    enable_service lid-boot-hold.service
+    enable_service lid-rotate.service
   fi
 }
