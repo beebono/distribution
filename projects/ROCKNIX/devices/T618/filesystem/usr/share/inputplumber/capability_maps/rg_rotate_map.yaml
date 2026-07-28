@@ -119,15 +119,19 @@ mapping:
         trigger:
           name: RightTrigger
 
-  - name: Right Stick Click
+  # The RG Rotate has no analog sticks, so the side button wired to BTN_THUMBR
+  # is free to act as a mode toggle. Emitting a DBus event instead of a gamepad
+  # button consumes it here, before the profile layer, so it never reaches the
+  # emulated pad and cannot be seen by a running game. rocknix-dpad-mode listens
+  # for this and swaps the device profile on a 2 second hold.
+  - name: Stick Mode Toggle
     source_events:
       - evdev:
           event_type: KEY
           event_code: BTN_THUMBR
           value_type: button
     target_event:
-      gamepad:
-        button: RightStick
+      dbus: ui_r3
 
   - name: Dpad Up
     source_events:
