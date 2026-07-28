@@ -1,0 +1,188 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (C) 2025-present ROCKNIX (https://github.com/ROCKNIX)
+
+# Half two of the hall-swivel settle window (see pre/002-lid-settle).
+#
+# Hold the device back for a moment, then decide whether this wake was
+# real. If the lid is shut when the window closes and nothing else claims
+# the wake, go straight back to suspend - the screen is still blanked
+# from the pre half and the inputs are grabbed, so the whole episode is
+# invisible. Otherwise hand the device back to the user.
+#
+# The settle runs in a transient unit, not a background job. This hook
+# executes inside systemd-suspend.service, a oneshot with the default
+# KillMode=control-group: when the hooks return, systemd kills every
+# process still in that cgroup. A plain '&' - even behind setsid, which
+# changes the session and not the cgroup - is SIGTERMed within
+# milliseconds of this script exiting, which leaves the backlight blanked
+# with nobody alive to restore it. systemd-run puts the settle under
+# system.slice, where it outlives the sleep operation.
+#
+# Returning immediately also keeps us clear of the InhibitDelayMaxSec
+# budget (5s default) that logind gives the whole resume, so the settle
+# length is free to tune.
+#
+# Deliberately biased towards staying awake. Every uncertain case -
+# unknown wake source, missing lid device, systemd-run refusing to
+# start - releases and lights the screen. A device that wakes when it
+# should not is an annoyance; one that will not stay awake is unusable.
+#
+# Ordered BEFORE audio on this half, so we don't blare something through
+# the speaker on accident.
+
+. /etc/profile
+
+LID_STATE_FILE="/run/.lid_settle_state"
+LID_ACTIVE_FILE="/run/.lid_settle_active"
+LID_ROTATE="/usr/lib/autostart/quirks/platforms/T618/bin/lid-rotate"
+
+SETTLE_MS="$(get_setting system.lid.settle_ms)"
+[ -z "${SETTLE_MS}" ] && SETTLE_MS=750
+
+RESUSPEND=0
+
+release() {
+  pkill -f "evtest --grab" >/dev/null 2>&1
+  for BL in /sys/class/backlight/*/bl_power; do
+    [ -e "${BL}" ] && echo 0 >"${BL}"
+  done
+  rm -f "${LID_STATE_FILE}" "${LID_ACTIVE_FILE}"
+  # Reconcile orientation against the level we are actually resuming at.
+  # The kernel re-reports SW_LID on every resume, but the input core
+  # drops an EV_SW event whose value has not changed, so the watcher has
+  # nothing to react to when the lid comes back the way it went down.
+  #
+  # Synchronous on purpose. Backgrounding it would put the child in
+  # whichever cgroup called us and it would be killed on the way out -
+  # the same trap the settle itself fell into. sway is up by now, so the
+  # call returns immediately; only the boot-time retry path is slow, and
+  # that path cannot be reached from here.
+  [ -x "${LID_ROTATE}" ] && "${LID_ROTATE}" --apply >/dev/null 2>&1
+}
+
+# Safety net for the settle child: if it is killed or dies part way
+# through, the screen comes back rather than staying dark forever. Only a
+# deliberate re-suspend is allowed to leave it blanked.
+on_exit() {
+  [ "${RESUSPEND}" = "1" ] && return
+  release
+}
+
+lid_device() {
+  local cap sw dev
+  for cap in /sys/class/input/event*/device/capabilities/sw; do
+    [ -e "${cap}" ] || continue
+    read -r sw <"${cap}"
+    sw="${sw##* }"
+    [ $(( 0x${sw} & 1 )) -eq 1 ] || continue
+    dev="${cap%/device/capabilities/sw}"
+    echo "/dev/input/${dev##*/}"
+    return 0
+  done
+  return 1
+}
+
+# What woke us, by name. Needs CONFIG_PM_SLEEP_DEBUG, which this device
+# carries for the section 2 work. Empty when the firmware woke us
+# without a linux irq ever firing, which does happen here.
+wake_source() {
+  local irq
+  read -r irq </sys/power/pm_wakeup_irq 2>/dev/null || return 1
+  [ -n "${irq}" ] || return 1
+  # Everything after the per-cpu counts: chip, trigger type, and the
+  # requesting device. The count column width varies with cpu count, so
+  # skip leading numeric fields rather than a fixed offset.
+  awk -v i="${irq}:" '$1 == i {
+    out = ""; seen = 0
+    for (n = 2; n <= NF; n++) {
+      if (!seen && $n ~ /^[0-9]+$/) continue
+      seen = 1
+      out = out (out == "" ? "" : " ") $n
+    }
+    print out; exit
+  }' /proc/interrupts
+}
+
+settle() {
+  trap on_exit EXIT TERM INT
+
+  local LID_DEV WAS WOKE DEV
+  LID_DEV="$(lid_device)"
+
+  if [ -z "${LID_DEV}" ]; then
+    log $0 "Settle: no SW_LID device, staying awake."
+    return
+  fi
+
+  # Take the inputs away for the duration of the window - everything
+  # except the device carrying the lid, which also carries the power and
+  # volume keys and has to keep reaching logind. The gamepad and the
+  # touchscreen are what would do damage during a rejected wake. These
+  # children share this unit's cgroup, so they die with it either way,
+  # which is the failsafe against leaving the device ungrabbable.
+  for DEV in /dev/input/event*; do
+    [ "${DEV}" = "${LID_DEV}" ] && continue
+    evtest --grab "${DEV}" >/dev/null 2>&1 &
+  done
+
+  # Let the resume finish before we consider asking for another suspend,
+  # and give the hinge time to stop moving. Same delay serves both.
+  sleep "$(awk -v ms="${SETTLE_MS}" 'BEGIN { print ms / 1000 }')"
+
+  WAS="$(cat ${LID_STATE_FILE} 2>/dev/null)"
+  WOKE="$(wake_source)"
+
+  if evtest --query "${LID_DEV}" EV_SW SW_LID; then
+    log $0 "Settle: lid open (was ${WAS:-unknown}, wake source '${WOKE:-unknown}'), staying awake."
+    return
+  fi
+
+  # Lid is shut, so this is a rejected wake only if the lid is also what
+  # woke us. Match that positively rather than by excluding the pmic:
+  # measured on hardware, a lid wake resolves to 'sprd-gpio 54 Edge Hall
+  # Swivel' - the pin and the gpio-keys label - and the power key to
+  # 'GICv3 205 Level spi0.0'. Anything else that wakes the device while
+  # the lid happens to be shut (rtc, charger, whatever comes later) asked
+  # to be awake for its own reasons and gets to stay awake.
+  case "${WOKE}" in
+    *"Hall Swivel"*) ;;
+    "")
+      log $0 "Settle: lid shut but wake source unknown, staying awake."
+      return
+      ;;
+    *)
+      log $0 "Settle: lid shut but '${WOKE}' claimed the wake, staying awake."
+      return
+      ;;
+  esac
+
+  log $0 "Settle: lid shut after ${SETTLE_MS}ms (was ${WAS:-unknown}, wake source '${WOKE}'), suspending again."
+  # Release the grabs so the next window starts clean, but leave the
+  # backlight blanked - it is about to be irrelevant, and not touching it
+  # means the screen never flickers on a rejected wake.
+  RESUSPEND=1
+  pkill -f "evtest --grab" >/dev/null 2>&1
+  rm -f "${LID_STATE_FILE}" "${LID_ACTIVE_FILE}"
+  systemctl suspend
+}
+
+# Nothing to undo - the pre half bailed out, or the settle is disabled.
+if [ ! -e "${LID_ACTIVE_FILE}" ]; then
+  exit 0
+fi
+
+if [ "$1" = "--settle" ]; then
+  settle
+  exit 0
+fi
+
+# --collect reaps the unit when it finishes, so the fixed name is free
+# again next time. If it will not start at all, do not leave the screen
+# dark: release here and now, synchronously, and skip the window.
+if ! systemd-run --quiet --collect --unit=lid-settle \
+       "$(readlink -f "$0")" --settle; then
+  log $0 "Settle: systemd-run failed, releasing without a settle window."
+  release
+fi
+exit 0
