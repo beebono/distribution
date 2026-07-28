@@ -32,7 +32,7 @@ case ${DEVICE} in
     PKG_PATCH_DIRS+=" 7.0"
     ;;
   T618)
-    PKG_VERSION="65aedb879dff1a1e2188cf3762e1cdd8bd27d5bb"
+    PKG_VERSION="30ef64dbddc0d4852a8e1475b1da0c082fad78f3"
     PKG_URL="https://github.com/beebono/linux-mainline-sprd/archive/${PKG_VERSION}.tar.gz"
     PKG_GIT_CLONE_BRANCH="rg-rotate"
     PKG_PATCH_DIRS+=" 7.0"
