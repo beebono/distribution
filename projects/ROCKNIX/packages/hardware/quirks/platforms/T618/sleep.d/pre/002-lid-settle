@@ -29,13 +29,16 @@
 
 LID_STATE_FILE="/run/.lid_settle_state"
 LID_ACTIVE_FILE="/run/.lid_settle_active"
+USB_POWER_FILE="/run/.usb_settle_power"
+USB_DATA_FILE="/run/.usb_settle_data"
 
 SETTLE_MS="$(get_setting system.lid.settle_ms)"
 [ -z "${SETTLE_MS}" ] && SETTLE_MS=750
 
 # Disabled - leave the display alone entirely.
 if [ "${SETTLE_MS}" = "0" ]; then
-  rm -f "${LID_STATE_FILE}" "${LID_ACTIVE_FILE}"
+  rm -f "${LID_STATE_FILE}" "${LID_ACTIVE_FILE}" \
+        "${USB_POWER_FILE}" "${USB_DATA_FILE}"
   exit 0
 fi
 
@@ -56,10 +59,60 @@ lid_device() {
   return 1
 }
 
+# USB/charger state, recorded so the post half can tell what a wake was
+# for. It cannot ask: the power key, the charger, the fuel gauge and the
+# Type-C controller are all children of the one PMIC irq, so every one of
+# them - measured, including with musb's own wakeup armed - resolves to
+# the same 'GICv3 205 Level spi0.0' in pm_wakeup_irq. There is nothing to
+# discriminate on there, so we diff state instead.
+#
+# Split in two because the two halves mean different things:
+#
+#   power - any supply's 'online'. Flips only for a charger, on both the
+#           charger psy and the tcpm source psy, and never for a data-only
+#           attach. Globbed rather than named: the charger registers as
+#           'aw32257-0' (an awinic variant handled by bq2415x_charger.c,
+#           bq->charger_desc.name = bq->name), which is neither stable nor
+#           guessable.
+#   data  - the usb role, the Type-C partner directory, and the set of
+#           attached usb devices. Any of these moving with 'online' steady
+#           is a data-only plug or unplug.
+#
+# Battery current_now/voltage_now are deliberately *not* recorded. They
+# drift on every single wake including a plain power-key press, so
+# including them would make every wake look like a usb event.
+usb_power_state() {
+  local f
+  for f in /sys/class/power_supply/*/online; do
+    [ -r "${f}" ] && echo "${f}=$(cat ${f} 2>/dev/null)"
+  done
+}
+
+usb_data_state() {
+  local f d
+  for f in /sys/class/usb_role/*/role; do
+    [ -r "${f}" ] && echo "${f}=$(cat ${f} 2>/dev/null)"
+  done
+  for d in /sys/class/typec/*-partner; do
+    [ -d "${d}" ] && echo "partner=${d}"
+  done
+  # Attached usb devices, skipping the ':'-suffixed interface directories.
+  for d in /sys/bus/usb/devices/*; do
+    case "${d##*/}" in
+      *:*) continue ;;
+    esac
+    [ -d "${d}" ] && echo "dev=${d##*/}"
+  done
+}
+
+usb_power_state >"${USB_POWER_FILE}" 2>/dev/null
+usb_data_state  >"${USB_DATA_FILE}"  2>/dev/null
+
 LID_DEV="$(lid_device)"
 if [ -z "${LID_DEV}" ]; then
   log $0 "No SW_LID input device, skipping settle window."
-  rm -f "${LID_STATE_FILE}" "${LID_ACTIVE_FILE}"
+  rm -f "${LID_STATE_FILE}" "${LID_ACTIVE_FILE}" \
+        "${USB_POWER_FILE}" "${USB_DATA_FILE}"
   exit 0
 fi
 
