@@ -35,10 +35,20 @@
 
 LID_STATE_FILE="/run/.lid_settle_state"
 LID_ACTIVE_FILE="/run/.lid_settle_active"
+USB_POWER_FILE="/run/.usb_settle_power"
+USB_DATA_FILE="/run/.usb_settle_data"
 LID_ROTATE="/usr/lib/autostart/quirks/platforms/T618/bin/lid-rotate"
+LED_STATUS="/usr/bin/battery_led_status"
 
 SETTLE_MS="$(get_setting system.lid.settle_ms)"
 [ -z "${SETTLE_MS}" ] && SETTLE_MS=750
+
+# Wake on a charger plug or unplug purely to refresh the charging LED,
+# then go straight back to sleep; do the same silently for a data-only
+# plug or unplug. 0 disables, leaving every usb wake to keep the device
+# awake as it did before.
+USB_AUTOSLEEP="$(get_setting system.usb.autosleep)"
+[ -z "${USB_AUTOSLEEP}" ] && USB_AUTOSLEEP=1
 
 RESUSPEND=0
 
@@ -47,7 +57,8 @@ release() {
   for BL in /sys/class/backlight/*/bl_power; do
     [ -e "${BL}" ] && echo 0 >"${BL}"
   done
-  rm -f "${LID_STATE_FILE}" "${LID_ACTIVE_FILE}"
+  rm -f "${LID_STATE_FILE}" "${LID_ACTIVE_FILE}" \
+        "${USB_POWER_FILE}" "${USB_DATA_FILE}"
   # Reconcile orientation against the level we are actually resuming at.
   # The kernel re-reports SW_LID on every resume, but the input core
   # drops an EV_SW event whose value has not changed, so the watcher has
@@ -104,6 +115,61 @@ wake_source() {
   }' /proc/interrupts
 }
 
+# Mirrors of the two recorders in pre/002-lid-settle. See the long comment
+# there for why the state is split into power and data, and why battery
+# current/voltage are excluded.
+usb_power_state() {
+  local f
+  for f in /sys/class/power_supply/*/online; do
+    [ -r "${f}" ] && echo "${f}=$(cat ${f} 2>/dev/null)"
+  done
+}
+
+usb_data_state() {
+  local f d
+  for f in /sys/class/usb_role/*/role; do
+    [ -r "${f}" ] && echo "${f}=$(cat ${f} 2>/dev/null)"
+  done
+  for d in /sys/class/typec/*-partner; do
+    [ -d "${d}" ] && echo "partner=${d}"
+  done
+  for d in /sys/bus/usb/devices/*; do
+    case "${d##*/}" in
+      *:*) continue ;;
+    esac
+    [ -d "${d}" ] && echo "dev=${d##*/}"
+  done
+}
+
+# 'charger', 'data' or empty. Checked after the settle window has already
+# elapsed, so PD negotiation has finished and the charger psy has caught
+# up - reading it any earlier races the contract.
+#
+# Power is tested first and wins: a charger attach moves the data state
+# too (the role goes to 'device', a partner appears), so testing data
+# first would misfile every charger event.
+usb_verdict() {
+  [ "${USB_AUTOSLEEP}" = "0" ] && return 0
+  [ -e "${USB_POWER_FILE}" ] || return 0
+
+  if [ "$(usb_power_state 2>/dev/null)" != "$(cat ${USB_POWER_FILE} 2>/dev/null)" ]; then
+    echo "charger"
+  elif [ "$(usb_data_state 2>/dev/null)" != "$(cat ${USB_DATA_FILE} 2>/dev/null)" ]; then
+    echo "data"
+  fi
+}
+
+# Give the device straight back to suspend. The backlight is deliberately
+# left blanked - it is about to be irrelevant, and not touching it means
+# the screen never flickers on a rejected wake.
+resuspend() {
+  RESUSPEND=1
+  pkill -f "evtest --grab" >/dev/null 2>&1
+  rm -f "${LID_STATE_FILE}" "${LID_ACTIVE_FILE}" \
+        "${USB_POWER_FILE}" "${USB_DATA_FILE}"
+  systemctl suspend
+}
+
 settle() {
   trap on_exit EXIT TERM INT
 
@@ -132,8 +198,53 @@ settle() {
 
   WAS="$(cat ${LID_STATE_FILE} 2>/dev/null)"
   WOKE="$(wake_source)"
+  USB="$(usb_verdict)"
 
+  # Level, not edge - the rule this whole section runs on. evtest --query
+  # exits 10 when the switch is set, and set means closed.
   if evtest --query "${LID_DEV}" EV_SW SW_LID; then
+    NOW="open"
+  else
+    NOW="closed"
+  fi
+
+  # Someone physically opened the swivel while we were down. That is an
+  # unambiguous request for the device, and it outranks any usb event that
+  # happened to land in the same window - plugging a charger in as you
+  # open the lid must not put the device back to sleep in your hands.
+  # Consistent with the bias everywhere else here: an unwanted wake is an
+  # annoyance, a device that will not stay awake is unusable.
+  if [ "${NOW}" = "open" ] && [ "${WAS}" = "closed" ]; then
+    log $0 "Settle: lid opened (wake source '${WOKE:-unknown}', usb '${USB:-none}'), staying awake."
+    return
+  fi
+
+  # Otherwise the usb verdict is checked before the lid, and regardless of
+  # which way the lid is facing. The device can be asleep with the swivel
+  # open - a power-key suspend leaves it that way - and a charger plugged
+  # in then should still refresh the led and go back to sleep rather than
+  # sitting awake on the user's desk.
+  case "${USB}" in
+    charger)
+      # Synchronous, and before the re-suspend. The led daemon polls once
+      # a second and is frozen across suspend, so it would never see this
+      # charger state; and backgrounding anything here hits the same
+      # KillMode=control-group trap the settle itself had to work around.
+      if [ -x "${LED_STATUS}" ]; then
+        "${LED_STATUS}" --once >/dev/null 2>&1
+      fi
+      log $0 "Settle: charger plug/unplug (wake source '${WOKE:-unknown}'), led refreshed, suspending again."
+      resuspend
+      return
+      ;;
+    data)
+      log $0 "Settle: data-only plug/unplug (wake source '${WOKE:-unknown}'), suspending again."
+      resuspend
+      return
+      ;;
+  esac
+
+  if [ "${NOW}" = "open" ]; then
     log $0 "Settle: lid open (was ${WAS:-unknown}, wake source '${WOKE:-unknown}'), staying awake."
     return
   fi
@@ -158,13 +269,7 @@ settle() {
   esac
 
   log $0 "Settle: lid shut after ${SETTLE_MS}ms (was ${WAS:-unknown}, wake source '${WOKE}'), suspending again."
-  # Release the grabs so the next window starts clean, but leave the
-  # backlight blanked - it is about to be irrelevant, and not touching it
-  # means the screen never flickers on a rejected wake.
-  RESUSPEND=1
-  pkill -f "evtest --grab" >/dev/null 2>&1
-  rm -f "${LID_STATE_FILE}" "${LID_ACTIVE_FILE}"
-  systemctl suspend
+  resuspend
 }
 
 # Nothing to undo - the pre half bailed out, or the settle is disabled.

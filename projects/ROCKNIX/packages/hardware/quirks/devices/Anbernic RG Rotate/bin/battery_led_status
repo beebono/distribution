@@ -75,7 +75,13 @@ PREV_UPPER=""
 PREV_LOWER=""
 PREV_BRI=""
 
-while true; do
+# One pass: read the battery, work out what the LEDs should show, write
+# only what changed. PREV_* are deliberately left global so the daemon
+# keeps its change-detection across calls; in --once mode they start
+# empty, which forces both LEDs to be written.
+function led_tick() {
+  local CAP STAT UPPER LOWER BRI BRI_CHANGED
+
   CAP=$(cat /sys/class/power_supply/battery/capacity)
   STAT=$(cat /sys/class/power_supply/battery/status)
   UPPER=$(get_upper_state ${CAP})
@@ -112,6 +118,18 @@ while true; do
     led_lower ${LOWER}
     PREV_LOWER="${LOWER}"
   fi
+}
 
+# Single-shot mode. Used by the T618 sleep quirk, which wakes on a charger
+# plug or unplug purely to refresh this LED and then goes straight back to
+# sleep - it cannot wait out a POLL_INTERVAL of the daemon, and the daemon
+# is frozen across suspend anyway.
+if [ "${1}" = "--once" ]; then
+  led_tick
+  exit 0
+fi
+
+while true; do
+  led_tick
   sleep ${POLL_INTERVAL}
 done
