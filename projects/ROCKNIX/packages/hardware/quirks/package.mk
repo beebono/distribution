@@ -26,4 +26,9 @@ post_install() {
   then
     enable_service volume-fixup.service
   fi
+  if [ "${DEVICE}" = "T618" ]
+  then
+    enable_service lid-boot-hold.service
+    enable_service lid-rotate.service
+  fi
 }
