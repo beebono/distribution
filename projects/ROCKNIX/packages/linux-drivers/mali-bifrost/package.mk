@@ -9,6 +9,10 @@ PKG_TOOLCHAIN="manual"
 PKG_IS_KERNEL_PKG="yes"
 
 case ${DEVICE} in
+  T618)
+  PKG_VERSION="3248d9d67ca16376e094bb73a0e1e54b153fc8a7"
+  PKG_URL="http://github.com/beebono/mali_kbase/archive/${PKG_VERSION}.tar.gz"
+  ;;
   RK3326)
   PKG_VERSION="r52p0-00eac0"
   PKG_URL="https://developer.arm.com/-/media/Files/downloads/mali-drivers/kernel/mali-valhall-gpu/VX504X08X-SW-99002-${PKG_VERSION}.tar"

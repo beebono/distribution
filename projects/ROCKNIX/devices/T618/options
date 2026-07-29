@@ -38,10 +38,7 @@
 
   # Mali GPU family
     MALI_FAMILY="bifrost-g52"
-  # panfrost only: mesa/panfrost out-renders the libmali blob on G52 GLES,
-  # and panvk covers Vulkan. libmali dropped (needs mali_kbase, which is
-  # mutually exclusive with panfrost and only presents zero-copy via KMS).
-    GRAPHIC_DRIVERS="panfrost"
+    GRAPHIC_DRIVERS="mali panfrost"
 
   # For maximum cross compatbility
     PREFER_GLES="yes"
@@ -65,7 +62,7 @@
   # for a list of additional drivers see packages/linux-drivers
   # Space separated list is supported,
   # e.g. ADDITIONAL_DRIVERS="DRIVER1 DRIVER2"
-    ADDITIONAL_DRIVERS=""
+    ADDITIONAL_DRIVERS="mali-bifrost"
 
   # Additional Firmware to use ( )
   # Space separated list is supported,
@@ -75,8 +72,8 @@
     FIRMWARE="extra-firmware"
 
   # Additional packages to install
-    ADDITIONAL_PACKAGES="inputplumber"
-    ADDITIONAL_PACKAGES_32BIT=""
+    ADDITIONAL_PACKAGES="inputplumber libmali"
+    ADDITIONAL_PACKAGES_32BIT="libmali"
 
   # Build and install rocknix out-of-tree device trees and overlays (yes / no)
     ROCKNIX_DEVICE_TREE_OVERLAYS="no"
