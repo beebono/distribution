@@ -1,0 +1,77 @@
+name: Promote run artifacts to pre-release
+
+# Publishes the images from an existing, already-completed build run as a
+# pre-release in this fork.  The runner pulls the artifacts from GitHub's
+# storage and pushes them straight back as release assets, so nothing is
+# uploaded from a local machine.
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Run ID holding the artifacts to publish'
+        required: true
+      tag:
+        description: 'Release tag (e.g. beta-20260730)'
+        required: true
+      title:
+        description: 'Release title (defaults to the tag)'
+        required: false
+      notes:
+        description: 'Release notes body'
+        required: false
+        default: |
+          Early Beta/Nightly build of this **unofficial** ROCKNIX fork.
+
+          Not supported by the official ROCKNIX development team - please do not
+          take problems with these images to the ROCKNIX Discord.  Report issues
+          on this repository instead.
+      pattern:
+        description: 'Artifact name pattern to publish'
+        required: false
+        default: 'ROCKNIX-@(image|update)*'
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  promote:
+    name: Promote to pre-release
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Maximize build space
+        uses: justinthelaw/maximize-github-runner-space@v0.9.0
+        with:
+          skip-components: docker-engine,gh-cli
+
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Download artifacts from run ${{ inputs.run_id }}
+        uses: actions/download-artifact@v8
+        with:
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          pattern: ${{ inputs.pattern }}
+          merge-multiple: true
+          path: assets
+
+      - name: List what will be published
+        run: ls -lh assets
+
+      - name: Create pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          NOTES: ${{ inputs.notes }}
+          TAG: ${{ inputs.tag }}
+          TITLE: ${{ inputs.title || inputs.tag }}
+        run: |
+          printf '%s\n' "$NOTES" > /tmp/notes.md
+          gh release create "$TAG" assets/* \
+            --target "${{ github.sha }}" \
+            --title "$TITLE" \
+            --notes-file /tmp/notes.md \
+            --prerelease
