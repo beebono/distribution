@@ -88,7 +88,7 @@ case "${DEVICE}" in
   T618)
     [ "${ENABLE_32BIT}" == "true" ] && EMUS_32BIT="box86 desmume-lr gpsp-lr pcsx_rearmed-lr"
     PKG_DEPENDS_TARGET+=" common-shaders glsl-shaders"
-    PKG_EMUS+=" aethersx2-sa azahar-sa dolphin-sa drastic-sa mednafen melonds-sa vita3k-sa armsx2-sa xemu-sa"
+    PKG_EMUS+=" aethersx2-sa azahar-sa dolphin-sa drastic-sa mednafen melonds-sa"
     LIBRETRO_CORES+=" dolphin-lr"
     ;;
   AMD64)
@@ -1182,7 +1182,7 @@ makeinstall_target() {
   RK3399|RK3576|RK3566|RK3588|SM6115|SM8250|SM8550|SM8650|SM8750|S922X|T618)
     add_emu_core ps2 aethersx2 aethersx2-sa true
     case ${DEVICE} in
-      S922X|SM6115|SM8250|SM8550|SM8650|SM8750|T618)
+      S922X|SM6115|SM8250|SM8550|SM8650|SM8750)
         add_emu_core ps2 armsx2 armsx2-sa false
         install_script "Start ARMSX2.sh"
       ;;
@@ -1214,7 +1214,7 @@ makeinstall_target() {
 
   ### Sony Playstation Vita
   case ${DEVICE} in
-    RK3566|T618|RK3576|RK3588|SM6115|SM8250|SM8550|SM8650|SM8750|S922X|AMD64)
+    RK3566|RK3576|RK3588|SM6115|SM8250|SM8550|SM8650|SM8750|S922X|AMD64)
       add_emu_core psvita vita3k vita3k-sa true
       add_es_system psvita
       install_script "Start Vita3K.sh"
@@ -1385,7 +1385,7 @@ makeinstall_target() {
 
   ### Microsoft XBox
   case ${DEVICE} in
-    SM8250|SM8550|SM8650|SM8750|AMD64|T618)
+    SM8250|SM8550|SM8650|SM8750|AMD64)
       add_emu_core xbox xemu xemu-sa true
       add_es_system xbox
       install_script "Start Xemu.sh"
