@@ -10,7 +10,7 @@ PKG_LONGDESC="extra-firmware: Extra kernel firmware needed for ROCKNIX devices"
 PKG_TOOLCHAIN="manual"
 
 if [[ "${DEVICE}" = "T618" ]]; then
-  PKG_VERSION="4fa73fd7351194c8ce2e63e182b923b115e2c323"
+  PKG_VERSION="92136aefd83b9a4c1e99ecea3c0a7f82b829019b"
   PKG_SITE="https://github.com/beebono/extra-firmware"
   PKG_URL="${PKG_SITE}/archive/${PKG_VERSION}.tar.gz"
 fi
