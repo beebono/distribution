@@ -88,7 +88,7 @@ case "${DEVICE}" in
   T618)
     [ "${ENABLE_32BIT}" == "true" ] && EMUS_32BIT="box86 desmume-lr gpsp-lr pcsx_rearmed-lr"
     PKG_DEPENDS_TARGET+=" common-shaders glsl-shaders"
-    PKG_EMUS+=" aethersx2-sa azahar-sa dolphin-sa drastic-sa mednafen melonds-sa"
+    PKG_EMUS+=" aethersx2-sa armsx2-sa azahar-sa dolphin-sa drastic-sa mednafen melonds-sa"
     LIBRETRO_CORES+=" dolphin-lr"
     ;;
   AMD64)
@@ -1182,7 +1182,7 @@ makeinstall_target() {
   RK3399|RK3576|RK3566|RK3588|SM6115|SM8250|SM8550|SM8650|SM8750|S922X|T618)
     add_emu_core ps2 aethersx2 aethersx2-sa true
     case ${DEVICE} in
-      S922X|SM6115|SM8250|SM8550|SM8650|SM8750)
+      S922X|SM6115|SM8250|SM8550|SM8650|SM8750|T618)
         add_emu_core ps2 armsx2 armsx2-sa false
         install_script "Start ARMSX2.sh"
       ;;
