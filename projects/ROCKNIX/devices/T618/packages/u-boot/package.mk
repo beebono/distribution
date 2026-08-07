@@ -2,7 +2,7 @@
 # Copyright (C) 2024-present ROCKNIX (https://github.com/ROCKNIX)
 
 PKG_NAME="u-boot"
-PKG_VERSION="34afab15d051a89ebfc4d2dd1c8cda8e1ce56ea9"
+PKG_VERSION="9342a7605565c52f4d5f3112f68af2202235546e"
 PKG_LICENSE="GPL"
 PKG_SITE="https://github.com/beebono/u-boot-ums512"
 PKG_URL="${PKG_SITE}.git"
