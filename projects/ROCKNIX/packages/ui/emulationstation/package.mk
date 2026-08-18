@@ -15,7 +15,7 @@ PKG_BUILD_FLAGS="-gold"
 PKG_PATCH_DIRS+="${DEVICE}"
 
 if [ "${DEVICE}" = "T618" ]; then
-  PKG_VERSION="79abff2f99019ad4fab66f2ade863fd5a4dca3e4"
+  PKG_VERSION="f33ea7723b2abcfe93eefe7394d38edd03a44052"
   PKG_SITE="https://github.com/beebono/emulationstation-next"
 fi
 
