@@ -136,6 +136,7 @@ EFBACCESS=$(get_setting skip_efb_cpu_access "${PLATFORM}" "${GAME}")
 EFBTEXTURE=$(get_setting store_efb_to_texture_only "${PLATFORM}" "${GAME}")
 XFBTEXTURE=$(get_setting store_xfb_to_texture_only "${PLATFORM}" "${GAME}")
 TEXTURE_CACHE_ACCURACY=$(get_setting texture_cache_accuracy "${PLATFORM}" "${GAME}")
+VISKIP=$(get_setting viskip "{$PLATFORM}" "${GAME}")
 RUMBLE=$(get_setting rumble "${PLATFORM}" "${GAME}")
 WHACK=$(get_setting widescreen_hack "${PLATFORM}" "${GAME}")
 WPC=$(get_setting write_protect_configs "${PLATFORM}" "${GAME}")
@@ -346,6 +347,13 @@ fi
     sed -i '/SafeTextureCacheColorSamples =/c\SafeTextureCacheColorSamples = 128' ${CONF_DIR}/${GFX_INI}
   fi
 
+  # VI Skip
+  if [ "$VISKIP" = "true" ]; then
+    sed -i sed -i '/VISkip =/c\VISkip = True' ${CONF_DIR}/${GFX_INI}
+  else
+    sed -i sed -i '/VISkip =/c\VISkip = False' ${CONF_DIR}/${GFX_INI}
+  fi
+
   # Widescreen Hack
   if [ "$WHACK" = "true" ]; then
     sed -i '/wideScreenHack =/c\wideScreenHack = True' ${CONF_DIR}/${GFX_INI}
@@ -488,6 +496,7 @@ fi
   echo "EFBTEXTURE set to: ${EFBTEXTURE}"
   echo "XFBTEXTURE set to: ${XFBTEXTURE}"
   echo "TEXTURE_CACHE_ACCURACY set to: ${TEXTURE_CACHE_ACCURACY}"
+  echo "VISKIP set to: ${VISKIP}"
   echo "RUMBLE set to: ${RUMBLE}"
   echo "WHACK set to: ${WHACK}"
   echo "WPC set to: ${WPC}"
