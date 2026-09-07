@@ -52,6 +52,7 @@ case "${DEVICE}" in
     [ "${ENABLE_32BIT}" == "true" ] && EMUS_32BIT="box86 desmume-lr gpsp-lr pcsx_rearmed-lr"
     PKG_DEPENDS_TARGET+=" common-shaders glsl-shaders"
     PKG_EMUS+=" aethersx2-sa azahar-sa dolphin-sa drastic-sa mednafen melonds-sa vita3k-sa"
+    [ "${DEVICE}" = "RK3566" ] && PKG_EMUS+=" dsperate-sa"
     LIBRETRO_CORES+=" dolphin-lr uae4arm-lr"
     ;;
   RK3588)
@@ -953,7 +954,17 @@ makeinstall_target() {
       add_emu_core nds retroarch desmume false
       add_emu_core nds retroarch skyemu false
       ;;
-    RK3399|RK3576|RK3566|RK3588|SM6115)
+    RK3566)
+      add_emu_core nds drastic drastic-sa true
+      add_emu_core nds dsperate dsperate-sa false
+      add_emu_core nds retroarch melonds false
+      add_emu_core nds retroarch melondsds false
+      add_emu_core nds melonds melonds-sa false
+      add_emu_core nds retroarch desmume false
+      add_emu_core nds retroarch skyemu false
+      install_script "Start MelonDS.sh"
+      ;;
+    RK3399|RK3576|RK3588|SM6115)
       add_emu_core nds drastic drastic-sa true
       add_emu_core nds retroarch melonds false
       add_emu_core nds retroarch melondsds false
