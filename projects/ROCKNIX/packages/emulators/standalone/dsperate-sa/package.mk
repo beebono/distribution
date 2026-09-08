@@ -2,24 +2,25 @@
 # Copyright (C) 2026-present ROCKNIX (https://github.com/ROCKNIX)
 
 PKG_NAME="dsperate-sa"
-PKG_VERSION="1ccfda1bc0db33d579313882934a86435abe27df"
+PKG_VERSION="1.11.1"
+PKG_SHA256="9e4df9daa7cf9a2a17c9de11318fde455713b86b0ad41e6168d119bd6d74a7c4"
+PKG_ARCH="aarch64"
 PKG_LICENSE="GPLv3"
 PKG_SITE="https://github.com/beebono/DSperate"
-PKG_URL="${PKG_SITE}.git"
-PKG_DEPENDS_TARGET="toolchain SDL2 alsa-lib"
+PKG_DEPENDS_TARGET="toolchain SDL2"
 PKG_LONGDESC="A Nintendo DS emulator reimplementing DraStic's JIT and NEON rendering with melonDS accuracy."
-PKG_TOOLCHAIN="cmake"
+PKG_TOOLCHAIN="manual"
 
-# The SDL frontend is the only thing shipped: no headless frontend, and the
-# unit tests are a host-side gate that would only lengthen the target build.
-PKG_CMAKE_OPTS_TARGET+=" -DCMAKE_BUILD_TYPE=Release \
-                         -DDSPERATE_SDL=ON \
-                         -DDSPERATE_HEADLESS=OFF \
-                         -DDSPERATE_TESTS=OFF"
+# Upstream CI ships a dynamically linked, PGO-built aarch64 binary (it only
+# needs SDL2, libstdc++ and glibc from the image). The committed PGO profile
+# is tied to the compiler that made it, so a local build with the ROCKNIX
+# toolchain can not apply it due to the compiler version mismatch.
+PKG_URL="${PKG_SITE}/releases/download/v${PKG_VERSION}/dsperate-v${PKG_VERSION}-linux-${TARGET_ARCH}.tar.gz"
+PKG_SOURCE_DIR="dsperate-v${PKG_VERSION}-linux-${TARGET_ARCH}"
 
 makeinstall_target() {
   mkdir -p ${INSTALL}/usr/bin
-  cp -f ${PKG_BUILD}/.${TARGET_NAME}/src/frontend/sdl/dsperate ${INSTALL}/usr/bin
+  cp -f ${PKG_BUILD}/dsperate ${INSTALL}/usr/bin
   cp -rf ${PKG_DIR}/scripts/* ${INSTALL}/usr/bin
   chmod 755 ${INSTALL}/usr/bin/*
 
