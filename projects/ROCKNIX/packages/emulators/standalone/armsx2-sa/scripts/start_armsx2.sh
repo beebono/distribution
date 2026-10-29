@@ -217,9 +217,13 @@ fi
 #Graphic driver fixes
 @GRAPHICS@
 
-#Vulkan driver: Adreno 6xx/7xx builds ship ARMSX2's own Turnip. Point the
+#Vulkan driver: Adreno 6xx/7xx builds ship ARMSX2's own Turnip, Mali-G52 builds
+#malisx2, which needs the kbase driver (libmali GPU driver mode). Point the
 #loader at it for this process only, unless the system driver was chosen.
 ARMSX2_ICD="/usr/share/armsx2-sa/turnip/freedreno_icd.aarch64.json"
+if [ -e /dev/mali0 ]; then
+  ARMSX2_ICD="/usr/share/malisx2/malisx2_icd.aarch64.json"
+fi
 if [ -f "${ARMSX2_ICD}" ] && [ "${VKDRIVER}" != "system" ]; then
   export VK_DRIVER_FILES="${ARMSX2_ICD}"
 fi

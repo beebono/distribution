@@ -101,10 +101,19 @@ EOF
     xmlstarlet ed --inplace -d '//choice[contains(@name, "vulkan")]' ${INSTALL}/usr/config/emulationstation/es_features.cfg
   fi
 
-  #ARMSX2's own Turnip ships only on these devices (see armsx2-sa)
+  #ARMSX2's own Turnip and malisx2 ship only on these devices (see armsx2-sa, azahar-sa)
   case ${DEVICE} in
-    SM4450|SM6115|SM8250|SM8550|SM8650|SDM845) ;;
-    *) xmlstarlet ed --inplace -d '//core[@name="armsx2-sa"]//feature[@name="vulkan driver"]' ${INSTALL}/usr/config/emulationstation/es_features.cfg ;;
+    SM4450|SM6115|SM8250|SM8550|SM8650|SDM845)
+      xmlstarlet ed --inplace -d '//core[@name="armsx2-sa"]//feature[@name="vulkan driver"]/choice[@value="malisx2"]' \
+                              -d '//core[@name="azahar-sa"]//feature[@name="vulkan driver"]' ${INSTALL}/usr/config/emulationstation/es_features.cfg
+      ;;
+    RK3566|S922X)
+      xmlstarlet ed --inplace -d '//core[@name="armsx2-sa"]//feature[@name="vulkan driver"]/choice[@value="armsx2"]' ${INSTALL}/usr/config/emulationstation/es_features.cfg
+      ;;
+    *)
+      xmlstarlet ed --inplace -d '//core[@name="armsx2-sa"]//feature[@name="vulkan driver"]' \
+                              -d '//core[@name="azahar-sa"]//feature[@name="vulkan driver"]' ${INSTALL}/usr/config/emulationstation/es_features.cfg
+      ;;
   esac
 }
 

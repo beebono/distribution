@@ -59,6 +59,7 @@ PLATFORM=$(echo "${2}"| sed "s#^/.*/##")
 CPU=$(get_setting cpu_speed "${PLATFORM}" "${GAME}")
 EMOUSE=$(get_setting emulate_mouse "${PLATFORM}" "${GAME}")
 RENDERER=$(get_setting graphics_backend "${PLATFORM}" "${GAME}")
+VKDRIVER=$(get_setting vulkan_driver "${PLATFORM}" "${GAME}")
 RES=$(get_setting resolution_scale "${PLATFORM}" "${GAME}")
 INTEGER_SCALING=$(get_setting integer_scaling "${PLATFORM}" "${GAME}")
 ROTATE=$(get_setting rotate_screen "${PLATFORM}" "${GAME}")
@@ -252,6 +253,14 @@ case ${HW_DEVICE} in
         [[ "${DEVICE_HAS_DUAL_SCREEN}" = "true" ]] && export QT_QPA_PLATFORM=xcb
     ;;
 esac
+
+# Vulkan driver: Mali-G52 builds ship malisx2, which needs the kbase driver (libmali
+# GPU driver mode). Point the loader at it for this process only, unless the
+# system driver was chosen.
+MALISX2_ICD="/usr/share/malisx2/malisx2_icd.aarch64.json"
+if [ -e /dev/mali0 ] && [ -f "${MALISX2_ICD}" ] && [ "${VKDRIVER}" != "system" ]; then
+  export VK_DRIVER_FILES="${MALISX2_ICD}"
+fi
 
 rm -rf /storage/.local/share/azahar
 ln -sf ${CONF_DIR} /storage/.local/share/azahar

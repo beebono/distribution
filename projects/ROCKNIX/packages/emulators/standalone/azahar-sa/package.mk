@@ -25,6 +25,12 @@ if [ "${VULKAN_SUPPORT}" = "yes" ]; then
   PKG_DEPENDS_TARGET+=" ${VULKAN}"
 fi
 
+case ${DEVICE} in
+  RK3566|S922X)
+    PKG_DEPENDS_TARGET+=" malisx2"
+    ;;
+esac
+
 PKG_CMAKE_OPTS_TARGET+=" -DENABLE_OPENGL=ON \
                          -DENABLE_QT=ON \
                          -DENABLE_QT_TRANSLATION=OFF \
