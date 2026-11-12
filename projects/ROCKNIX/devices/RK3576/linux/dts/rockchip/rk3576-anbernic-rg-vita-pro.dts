@@ -524,6 +524,25 @@
 	status = "okay";
 };
 
+/* The CRU has no GPU rate between 594, 786.432 and 1000 MHz, so 700 ran
+   at 594 and 800-950 at 786; keep only steps that match a real rate */
+&gpu_opp_table {
+	/delete-node/ opp-700000000;
+	/delete-node/ opp-800000000;
+	/delete-node/ opp-900000000;
+	/delete-node/ opp-950000000;
+
+	opp-786432000 {
+		opp-hz = /bits/ 64 <786432000>;
+		opp-microvolt = <775000 775000 850000>;
+	};
+
+	opp-1000000000 {
+		opp-hz = /bits/ 64 <1000000000>;
+		opp-microvolt = <850000 850000 850000>;
+	};
+};
+
 &hdmi {
 	status = "okay";
 };
