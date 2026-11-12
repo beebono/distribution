@@ -28,7 +28,7 @@
     KERNEL_MAKE_EXTRACMD=" $(get_kernel_make_extracmd)"
 
   # Kernel cmdline
-    EXTRA_CMDLINE="quiet console=ttyS0 console=tty0 systemd.debug_shell=ttyS0 coherent_pool=2M"
+    EXTRA_CMDLINE="quiet console=ttyS0,1500000 console=tty0 systemd.debug_shell=ttyS0 coherent_pool=2M"
 
   # Bootloader to use (syslinux / u-boot)
     BOOTLOADER="u-boot"
@@ -63,7 +63,7 @@
   # for a list of additional drivers see packages/linux-drivers
   # Space separated list is supported,
   # e.g. ADDITIONAL_DRIVERS="DRIVER1 DRIVER2"
-    ADDITIONAL_DRIVERS="mali-bifrost"
+    ADDITIONAL_DRIVERS="mali-bifrost aic8800"
 
   # Additional Firmware to use ( )
   # Space separated list is supported,
