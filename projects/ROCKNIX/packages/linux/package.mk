@@ -46,8 +46,8 @@ case ${DEVICE} in
     ;;
   MT6897)
     # Mainline-based tree with MT6897 support that is not upstream yet.
-    PKG_VERSION="895bd750157407675bcc31feaf3e6f89113ee7a4"
-    PKG_SHA256="16e157b78990cbcffffa496531aec9a671a3605042cd0a17fde1b047040f2211"
+    PKG_VERSION="5a5d21996618cf250c1b88b6d1e3edc8616c502a"
+    PKG_SHA256="f9bf5a0d46c2ca27378a228031364a71b9e65af6b60793bb9cf09b330ab1510f"
     PKG_URL="https://github.com/beebono/rg477m-linux/archive/${PKG_VERSION}.tar.gz"
     PKG_SOURCE_DIR="rg477m-linux-${PKG_VERSION}"
     PKG_PATCH_DIRS="${DEVICE}"
