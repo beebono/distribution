@@ -1,0 +1,14 @@
+# BRING-UP ONLY, remove before any release: an unauthenticated root shell on the
+# USB serial gadget (ttyGS0, from CONFIG_USB_G_SERIAL), for the port's test scripts.
+# The proper channel is ROCKNIX's own usbgadget (NCM + ssh), which needs G_SERIAL off.
+[Unit]
+Description=MT6897 bring-up root shell on the USB serial gadget
+ConditionPathExists=/dev/ttyGS0
+
+[Service]
+ExecStart=/bin/sh -c 'exec /bin/sh -l </dev/ttyGS0 >/dev/ttyGS0 2>&1'
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target

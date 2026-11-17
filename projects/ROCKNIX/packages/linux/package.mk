@@ -44,7 +44,15 @@ case ${DEVICE} in
     PKG_URL="https://www.kernel.org/pub/linux/kernel/v${PKG_VERSION/.*/}.x/${PKG_NAME}-${PKG_VERSION}.tar.xz"
     PKG_PATCH_DIRS+=" 7.2.6"
     ;;
-  AMD64|H700|SM4450|SM8250|SM8650|SM8750)
+  MT6897)
+    # Mainline-based tree with MT6897 support that is not upstream yet.
+    PKG_VERSION="895bd750157407675bcc31feaf3e6f89113ee7a4"
+    PKG_SHA256="16e157b78990cbcffffa496531aec9a671a3605042cd0a17fde1b047040f2211"
+    PKG_URL="https://github.com/beebono/rg477m-linux/archive/${PKG_VERSION}.tar.gz"
+    PKG_SOURCE_DIR="rg477m-linux-${PKG_VERSION}"
+    PKG_PATCH_DIRS="${DEVICE}"
+    ;;
+  AMD64|H700|SM4450|SM6115|SM8250|SM8550|SM8650|SM8750)
     PKG_VERSION="7.2"
     PKG_SHA256="f9fef3d14c0df53819026f4be74459835c2a0b0dcbf5b5bbd9ea19f0829402b3"
     PKG_URL="https://www.kernel.org/pub/linux/kernel/v${PKG_VERSION/.*/}.x/${PKG_NAME}-${PKG_VERSION}.tar.xz"
@@ -63,6 +71,8 @@ case ${DEVICE} in
     PKG_URL="https://www.kernel.org/pub/linux/kernel/v${PKG_VERSION/.*/}.x/${PKG_NAME}-${PKG_VERSION}.tar.xz"
     ;;
 esac
+
+[ "${BOOTLOADER}" = "mtk-lk" ] && PKG_DEPENDS_TARGET+=" mkbootimg:host avbtool:host lz4:host"
 
 PKG_KERNEL_CFG_FILE=$(kernel_config_path) || die
 
@@ -167,6 +177,19 @@ pre_make_target() {
 
   # set initramfs source
   ${PKG_BUILD}/scripts/config --set-str CONFIG_INITRAMFS_SOURCE "$(kernel_initramfs_confs) ${BUILD}/initramfs"
+
+  # The MediaTek LK bootloader does not pass a boot image command line on to
+  # the kernel, so the kernel carries it.
+  if [ "${BOOTLOADER}" = "mtk-lk" ]; then
+    ${PKG_BUILD}/scripts/config --set-str CONFIG_CMDLINE "boot=LABEL=${DISTRO_BOOTLABEL} disk=LABEL=${DISTRO_DISKLABEL} ${EXTRA_CMDLINE}"
+    ${PKG_BUILD}/scripts/config --disable CONFIG_CMDLINE_FROM_BOOTLOADER
+    ${PKG_BUILD}/scripts/config --enable CONFIG_CMDLINE_FORCE
+    # The bootloader always hands over the vendor_boot and init_boot ramdisks,
+    # and the stock vendor ramdisk carries its own /init, bin, etc and lib. Unpacked
+    # over the built-in initramfs it replaces ours, so ignore it. (The bootconfig
+    # block appended to it is still read.)
+    ${PKG_BUILD}/scripts/config --enable CONFIG_INITRAMFS_FORCE
+  fi
 
   # set default hostname based on ${DISTRONAME}
   ${PKG_BUILD}/scripts/config --set-str CONFIG_DEFAULT_HOSTNAME "${DISTRONAME}"
@@ -361,6 +384,11 @@ pre_make_target() {
 }
 
 make_target() {
+  # A kernel that embeds its board device tree needs it built before the image.
+  if grep -q '^CONFIG_ARM64_EMBEDDED_DTB=' .config; then
+    DTC_FLAGS=-@ kernel_make ${KERNEL_MAKE_EXTRACMD}
+  fi
+
   DTC_FLAGS=-@ kernel_make ${KERNEL_TARGET} ${KERNEL_MAKE_EXTRACMD} modules
 
   if [ "${PKG_BUILD_PERF}" = "yes" ]; then
@@ -410,7 +438,28 @@ make_target() {
 
 makeinstall_target() {
   mkdir -p ${INSTALL}/.image
-  cp -p arch/${TARGET_KERNEL_ARCH}/boot/${KERNEL_TARGET} System.map .config Module.symvers ${INSTALL}/.image/
+  cp -p System.map .config Module.symvers ${INSTALL}/.image/
+  if [ "${BOOTLOADER}" != "mtk-lk" ]; then
+    cp -p arch/${TARGET_KERNEL_ARCH}/boot/${KERNEL_TARGET} ${INSTALL}/.image/
+  else
+    # The MediaTek LK bootloader only loads an Android boot image from the
+    # internal boot partition. KERNEL is therefore that image, ready to be
+    # written to the partition: header v4, no ramdisk (the initramfs is built
+    # into the kernel) and an AVB hash footer signed with the public AOSP test
+    # key, which is the key these devices' vbmeta is signed with.
+    python3 "${TOOLCHAIN}/mkbootimg/mkbootimg.py" \
+      --header_version 4 \
+      --kernel "arch/${TARGET_KERNEL_ARCH}/boot/${KERNEL_TARGET}" \
+      --os_version 14.0.0 --os_patch_level "$(date '+%Y-%m')" \
+      --cmdline "boot=LABEL=${DISTRO_BOOTLABEL} disk=LABEL=${DISTRO_DISKLABEL} ${EXTRA_CMDLINE}" \
+      -o "${INSTALL}/.image/${KERNEL_TARGET}" || { exit 1; }
+    python3 "${TOOLCHAIN}/avbtool/avbtool.py" add_hash_footer \
+      --image "${INSTALL}/.image/${KERNEL_TARGET}" \
+      --partition_name boot \
+      --partition_size "${MTK_LK_BOOT_PARTITION_SIZE:-67108864}" \
+      --algorithm SHA256_RSA2048 \
+      --key "${TOOLCHAIN}/avbtool/testkey_rsa2048.pem" || { exit 1; }
+  fi
 
   kernel_make INSTALL_MOD_PATH=${INSTALL}/$(get_kernel_overlay_dir) modules_install
   rm -f ${INSTALL}/$(get_kernel_overlay_dir)/lib/modules/*/build

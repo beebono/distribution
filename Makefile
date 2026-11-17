@@ -101,6 +101,10 @@ SM8750:
 	unset DEVICE_ROOT
 	PROJECT=ROCKNIX DEVICE=SM8750 ARCH=aarch64 ./scripts/build_distro
 
+MT6897:
+	unset DEVICE_ROOT
+	PROJECT=ROCKNIX DEVICE=MT6897 ARCH=aarch64 ./scripts/build_distro
+
 SDM845:
 	unset DEVICE_ROOT
 	PROJECT=ROCKNIX DEVICE=SDM845 ARCH=arm ./scripts/build_distro

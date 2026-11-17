@@ -1,0 +1,88 @@
+################################################################################
+# setup device defaults
+################################################################################
+
+  # The TARGET_CPU variable controls which processor should be targeted for
+  # generated code.
+  # MediaTek Dimensity 8300 (MT6897): 4x Cortex-A715 + 4x Cortex-A510.
+  # SVE/SVE2 are present but left off, as on the other ARMv9 devices.
+    case ${TARGET_ARCH} in
+      aarch64)
+        TARGET_CPU="cortex-a715"
+        TARGET_CPU_FLAGS="+fp16+crypto+i8mm+bf16+sm4+sha3+nosve+nosve2"
+        ENABLE_32BIT="no"
+        ;;
+    esac
+
+    PARTITION_TABLE="gpt"
+    HW_CPU="MediaTek Dimensity 8300"
+
+  # Kernel target
+    KERNEL_TARGET="Image.lz4"
+
+  # Additional kernel make parameters
+    KERNEL_MAKE_EXTRACMD=" $(get_kernel_make_extracmd)"
+
+  # Kernel cmdline (built into the kernel for mtk-lk; "bootconfig" makes the
+  # bootloader's bootconfig, with the active slot, readable in /proc/bootconfig)
+  # clk_ignore_unused/pd_ignore_unused: not every consumer holds its clocks and
+  # power domains yet; drop them once they do.
+    EXTRA_CMDLINE="quiet rootwait bootconfig console=tty0 clk_ignore_unused pd_ignore_unused watchdog.open_timeout=120"
+
+  # Bootloader to use (syslinux / u-boot / arm-efi / mtk-lk)
+  # mtk-lk: the MediaTek bootloader loads an Android boot image from the
+  # internal boot partition. KERNEL is built as that image.
+    BOOTLOADER="mtk-lk"
+
+  # Mali GPU family (Mali-G615, Valhall CSF arch 11: panthor + panfrost)
+    GRAPHIC_DRIVERS="panfrost"
+
+  # For maximum cross compatbility
+    PREFER_GLES="yes"
+
+  # VULKAN_SUPPORT
+    VULKAN_SUPPORT="yes"
+
+  # Vulkan implementation to use (vulkan-loader / no)
+    VULKAN="vulkan-loader"
+
+  # Displayserver to use (wl / no)
+    DISPLAYSERVER="wl"
+
+  # Windowmanager to use (weston / swaywm-env / no)
+    WINDOWMANAGER="swaywm-env"
+
+  # Pipewire audio support (yes / no)
+    PIPEWIRE_SUPPORT="yes"
+
+  # Additional drivers to install:
+  # for a list of additional drivers see packages/linux-drivers
+  # Space separated list is supported,
+  # e.g. ADDITIONAL_DRIVERS="DRIVER1 DRIVER2"
+    ADDITIONAL_DRIVERS=""
+
+  # Additional Firmware to use ( )
+  # Space separated list is supported,
+  # e.g. FIRMWARE=""
+    FIRMWARE=""
+
+  # Additional packages to install
+    ADDITIONAL_PACKAGES="inputplumber kmscube"
+
+  # Debug tty path
+    DEBUG_TTY="/dev/ttyS0"
+
+  # No rocknix jopad
+    ROCKNIX_JOYPAD="no"
+
+  # Build and install rocknix out-of-tree device trees and overlays (yes / no)
+    ROCKNIX_DEVICE_TREE_OVERLAYS="no"
+
+  # ZRAM Algorithm
+    ZRAM_COMPRESSION_ALGO="zstd"
+
+  # ZRAM Size
+    ZRAM_SWAP_SIZE="Auto"
+
+  # Disk Swap
+    SWAP_FILE_SIZE="0"

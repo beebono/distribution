@@ -8,6 +8,17 @@ PKG_SHA256="89d4c3bf09fac8968f4198d00a6328e5e0df02f18d4b17b8eedc6b1a5773ae6b"
 PKG_LICENSE="OSS"
 PKG_SITE="http://www.mesa3d.org/"
 PKG_URL="https://gitlab.freedesktop.org/mesa/mesa/-/archive/mesa-${PKG_VERSION}/mesa-mesa-${PKG_VERSION}.tar.gz"
+case ${DEVICE} in
+  MT6897)
+    # Mali-G615 is Valhall arch 11, which panfrost/panvk only build on main
+    # (27.0-devel). The patches for the release above do not apply there.
+    PKG_VERSION="ae3a8644ad73636e976e98ef6da6b9d8487a4e9e"
+    PKG_SHA256="653df0d9dc2026dc4910e2a34a621532acef92c2dc73269065b540c8b64c418d"
+    PKG_URL="https://gitlab.freedesktop.org/mesa/mesa/-/archive/${PKG_VERSION}/mesa-${PKG_VERSION}.tar.gz"
+    PKG_SKIP_PATCHES="yes"
+    ;;
+esac
+
 PKG_DEPENDS_HOST="toolchain:host expat:host libclc:host libdrm:host llvm:host Mako:host pyyaml:host spirv-tools:host"
 PKG_DEPENDS_TARGET="toolchain expat libdrm Mako:host pyyaml:host"
 PKG_LONGDESC="Mesa is a 3-D graphics library with an API."
@@ -48,6 +59,13 @@ PKG_MESON_OPTS_TARGET="-Dc_link_args=-lgcc \
                        -Dlmsensors=disabled \
                        -Dbuild-tests=false \
                        -Dmicrosoft-clc=disabled"
+
+if [ "${DEVICE}" = "MT6897" ]; then
+  # Mesa main builds an optional Rust shader compiler (kraid) for panfrost by
+  # default; the C compilers are enough and keep Rust out of the build.
+  PKG_MESON_OPTS_HOST+=" -Dpanfrost-rust=false"
+  PKG_MESON_OPTS_TARGET+=" -Dpanfrost-rust=false"
+fi
 
 if listcontains "${GRAPHIC_DRIVERS}" "panfrost"; then
   # These options require that we have built mesa host as specified above

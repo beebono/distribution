@@ -25,7 +25,7 @@
       TARGET_SUBARCH=aarch64
       TARGET_VARIANT=armv8.2-a
       ;;
-    cortex-x3)
+    cortex-x3|cortex-a715)
       TARGET_SUBARCH=aarch64
       TARGET_VARIANT=armv9-a
       ;;
