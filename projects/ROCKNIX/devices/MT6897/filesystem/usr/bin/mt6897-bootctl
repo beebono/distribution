@@ -1,0 +1,61 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (C) 2026 ROCKNIX (https://github.com/ROCKNIX)
+#
+# A/B boot control for MediaTek LK devices. ROCKNIX lives on slot B; the
+# bootloader gives an unconfirmed slot 7 tries and then falls back to slot A
+# (Android). The record is the AOSP bootloader_control structure, 32 bytes at
+# offset 2048 of the "misc" partition:
+#   0  slot suffix[4]   4 magic "BCAB"   8 version   9 slot count
+#   12 slot A, 14 slot B: byte = priority (bits 0-3) | tries left (bits 4-6)
+#                                | successful (bit 7)
+#   28 CRC-32 (little endian) of bytes 0-27
+#
+#   mt6897-bootctl status           print the record
+#   mt6897-bootctl mark-successful  confirm slot B (tries 1, successful)
+#   mt6897-bootctl rearm            unconfirm slot B (7 tries), for use after
+#                                   writing a new kernel, so a bad one falls back
+#
+# Only the 32-byte record is ever written, only for slot B, only when the
+# existing record is valid, and every write is read back.
+
+DEV="${BOOTCTL_DEV:-/dev/disk/by-partlabel/misc}"
+OFF=2048
+
+die() { echo "mt6897-bootctl: $*" >&2; exit 1; }
+hex() { od -An -v -tx1 | tr -d ' \n'; }
+rec() { dd if="${DEV}" bs=1 skip=${OFF} count=32 2>/dev/null | hex; }
+# CRC-32 of stdin as 8 hex digits in on-disk (little endian) order: gzip's trailer
+crc() { gzip -c | tail -c 8 | head -c 4 | hex; }
+unhex() { for b in $(echo "$1" | sed 's/../& /g'); do printf "\\$(printf '%03o' 0x${b})"; done; }
+
+[ -e "${DEV}" ] || die "no misc partition at ${DEV}"
+R=$(rec)
+[ ${#R} = 64 ] || die "short read"
+[ "$(echo "${R}" | cut -c9-16)" = "42434142" ] || die "bad magic"
+[ "$(echo "${R}" | cut -c17-18)" = "01" ] || die "unknown version"
+[ "$(unhex "$(echo "${R}" | cut -c1-56)" | crc)" = "$(echo "${R}" | cut -c57-64)" ] || die "bad CRC"
+
+A=$((0x$(echo "${R}" | cut -c25-26))); B=$((0x$(echo "${R}" | cut -c29-30)))
+show() { echo "slot $1: priority $(($2 & 15)), tries $((($2 >> 4) & 7)), successful $((($2 >> 7) & 1))"; }
+
+case "$1" in
+  status) show a ${A}; show b ${B}; exit 0 ;;
+  mark-successful) NEW=$(((B & 15) | 0x10 | 0x80)) ;;
+  rearm) NEW=$(((B & 15) | 0x70)) ;;
+  *) die "usage: $0 status|mark-successful|rearm" ;;
+esac
+
+if [ -z "${BOOTCTL_DEV}" ]; then
+  grep -q 'androidboot.slot_suffix = "_b"' /proc/bootconfig 2>/dev/null || die "not running from slot B"
+fi
+[ $((B & 15)) -gt 0 ] || die "slot B has priority 0 (unbootable); leaving it alone"
+[ ${NEW} = ${B} ] && { echo "slot B already as requested"; exit 0; }
+
+BODY="$(echo "${R}" | cut -c1-28)$(printf '%02x' ${NEW})$(echo "${R}" | cut -c31-56)"
+OUT="${BODY}$(unhex "${BODY}" | crc)"
+[ ${#OUT} = 64 ] || die "internal error building record"
+unhex "${OUT}" | dd of="${DEV}" bs=1 seek=${OFF} count=32 conv=notrunc,fsync 2>/dev/null || die "write failed"
+sync
+[ "$(rec)" = "${OUT}" ] || die "READ-BACK MISMATCH"
+show b ${NEW}
